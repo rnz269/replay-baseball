@@ -92,47 +92,68 @@
     // Fireworks celebration component
     const Fireworks = ({ active, duration = 2000 }) => {
       const [particles, setParticles] = useState([]);
+      const [sparkles, setSparkles] = useState([]);
       const [show, setShow] = useState(false);
+      const activeRef = useRef(false);
 
       useEffect(() => {
-        if (active) {
+        // Only trigger on rising edge (false -> true)
+        if (active && !activeRef.current) {
+          activeRef.current = true;
           setShow(true);
-          // Create multiple firework bursts
+
+          // Create particles once
           const colors = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6b9d', '#c44dff', '#ff8c42'];
           const newParticles = [];
-
-          // Create 3-5 firework bursts at random positions
           const numBursts = 3 + Math.floor(Math.random() * 3);
+
           for (let burst = 0; burst < numBursts; burst++) {
-            const centerX = 20 + Math.random() * 60; // 20-80% of container width
-            const centerY = 20 + Math.random() * 40; // 20-60% of container height
+            const centerX = 20 + Math.random() * 60;
+            const centerY = 20 + Math.random() * 40;
             const numParticles = 12 + Math.floor(Math.random() * 8);
-            const burstDelay = burst * 200; // Stagger bursts
+            const burstDelay = burst * 200;
 
             for (let i = 0; i < numParticles; i++) {
               const angle = (i / numParticles) * Math.PI * 2;
               const velocity = 50 + Math.random() * 50;
-              const color = colors[Math.floor(Math.random() * colors.length)];
               newParticles.push({
                 id: `${burst}-${i}`,
                 x: centerX,
                 y: centerY,
                 dx: Math.cos(angle) * velocity,
                 dy: Math.sin(angle) * velocity,
-                color,
+                color: colors[Math.floor(Math.random() * colors.length)],
                 size: 3 + Math.random() * 4,
                 delay: burstDelay,
-                duration: 800 + Math.random() * 400,
+                animDuration: 800 + Math.random() * 400,
               });
             }
           }
           setParticles(newParticles);
 
+          // Create sparkles once with fixed positions
+          const emojiOptions = ['✨', '🎆', '⭐', '💥', '🌟'];
+          const newSparkles = [...Array(8)].map((_, i) => ({
+            id: i,
+            left: 15 + Math.random() * 70,
+            top: 10 + Math.random() * 50,
+            emoji: emojiOptions[Math.floor(Math.random() * emojiOptions.length)],
+            animDuration: 600 + Math.random() * 400,
+            delay: i * 150,
+          }));
+          setSparkles(newSparkles);
+
+          // Clean up after duration
           const timer = setTimeout(() => {
             setShow(false);
             setParticles([]);
+            setSparkles([]);
+            activeRef.current = false;
           }, duration);
+
           return () => clearTimeout(timer);
+        } else if (!active) {
+          activeRef.current = false;
         }
       }, [active, duration]);
 
@@ -151,23 +172,22 @@
                 height: p.size,
                 backgroundColor: p.color,
                 boxShadow: `0 0 ${p.size * 2}px ${p.color}`,
-                animation: `firework-particle ${p.duration}ms ease-out ${p.delay}ms forwards`,
+                animation: `firework-particle ${p.animDuration}ms ease-out ${p.delay}ms forwards`,
                 transform: `translate(${p.dx}px, ${p.dy}px)`,
               }}
             />
           ))}
-          {/* Sparkle emoji bursts */}
-          {[...Array(8)].map((_, i) => (
+          {sparkles.map(s => (
             <div
-              key={`sparkle-${i}`}
+              key={`sparkle-${s.id}`}
               className="absolute text-2xl"
               style={{
-                left: `${15 + Math.random() * 70}%`,
-                top: `${10 + Math.random() * 50}%`,
-                animation: `sparkle ${600 + Math.random() * 400}ms ease-out ${i * 150}ms`,
+                left: `${s.left}%`,
+                top: `${s.top}%`,
+                animation: `sparkle ${s.animDuration}ms ease-out ${s.delay}ms forwards`,
               }}
             >
-              {['✨', '🎆', '⭐', '💥', '🌟'][Math.floor(Math.random() * 5)]}
+              {s.emoji}
             </div>
           ))}
         </div>
@@ -441,6 +461,13 @@
               lastHalfInning = halfInningKey;
             }
 
+            // Save score BEFORE this at-bat (for pitch-by-pitch - no spoilers!)
+            const scoreBeforeAtBat = {
+              away: currentAwayScore,
+              home: currentHomeScore
+            };
+
+            // Update score AFTER saving pre-at-bat score
             if (isScoring) {
               const runs = play.result.rbi || 1;
               if (isTop) currentAwayScore += runs;
@@ -521,7 +548,7 @@
                   const balls = event.count?.balls ?? 0;
                   const strikes = event.count?.strikes ?? 0;
 
-                  // Use pre-play base state (bases at start of this at-bat)
+                  // Use pre-play base state and pre-at-bat SCORE (no spoilers!)
                   pitches.push({
                     playIndex: playIndex,
                     pitchNum: pitchNum,
@@ -536,8 +563,8 @@
                     isTop: isTop,
                     outs: event.count?.outs ?? 0,
                     bases: { ...basesBeforePlay },
-                    awayScore: currentAwayScore,
-                    homeScore: currentHomeScore,
+                    awayScore: scoreBeforeAtBat.away,
+                    homeScore: scoreBeforeAtBat.home,
                     isFinal: false
                   });
                 }
