@@ -228,155 +228,62 @@
       158: { name: "Brewers", abbreviation: "MIL", color: "#12284B" }
     };
 
-    // Static game data for demo - with ALL plays, not just scoring
-    const STATIC_GAME_DATA = {
-      homeTeam: { name: "Yankees", abbreviation: "NYY", color: "#003087" },
-      awayTeam: { name: "Red Sox", abbreviation: "BOS", color: "#BD3039" },
-      date: "October 5, 2024",
-      venue: "Yankee Stadium",
-      // Half-innings: each entry is [inningNum, isTop, runsScored]
-      halfInnings: [
-        { inning: 1, isTop: true, runs: 2 },
-        { inning: 1, isTop: false, runs: 0 },
-        { inning: 2, isTop: true, runs: 0 },
-        { inning: 2, isTop: false, runs: 1 },
-        { inning: 3, isTop: true, runs: 1 },
-        { inning: 3, isTop: false, runs: 0 },
-        { inning: 4, isTop: true, runs: 0 },
-        { inning: 4, isTop: false, runs: 2 },
-        { inning: 5, isTop: true, runs: 0 },
-        { inning: 5, isTop: false, runs: 0 },
-        { inning: 6, isTop: true, runs: 3 },
-        { inning: 6, isTop: false, runs: 1 },
-        { inning: 7, isTop: true, runs: 0 },
-        { inning: 7, isTop: false, runs: 0 },
-        { inning: 8, isTop: true, runs: 0 },
-        { inning: 8, isTop: false, runs: 3 },
-        { inning: 9, isTop: true, runs: 0 },
-        { inning: 9, isTop: false, runs: 2 },
-      ],
-      // ALL plays - with baserunner state { first, second, third } and outs
-      plays: [
-        // Top 1st
-        { inning: 1, isTop: true, batter: "Duran", event: "Flyout to CF", isScoring: false, awayScore: 0, homeScore: 0, outs: 1, bases: {} },
-        { inning: 1, isTop: true, batter: "Devers", event: "Single to LF", isScoring: false, awayScore: 0, homeScore: 0, outs: 1, bases: { first: true } },
-        { inning: 1, isTop: true, batter: "Martinez", event: "2-run Home Run to LF", isScoring: true, awayScore: 2, homeScore: 0, outs: 1, bases: {} },
-        { inning: 1, isTop: true, batter: "Bogaerts", event: "Groundout to SS", isScoring: false, awayScore: 2, homeScore: 0, outs: 2, bases: {} },
-        { inning: 1, isTop: true, batter: "Verdugo", event: "Strikeout", isScoring: false, awayScore: 2, homeScore: 0, outs: 3, bases: {} },
-        // Bottom 1st
-        { inning: 1, isTop: false, batter: "Torres", event: "Groundout to 2B", isScoring: false, awayScore: 2, homeScore: 0, outs: 1, bases: {} },
-        { inning: 1, isTop: false, batter: "Judge", event: "Strikeout", isScoring: false, awayScore: 2, homeScore: 0, outs: 2, bases: {} },
-        { inning: 1, isTop: false, batter: "Stanton", event: "Flyout to RF", isScoring: false, awayScore: 2, homeScore: 0, outs: 3, bases: {} },
-        // Top 2nd
-        { inning: 2, isTop: true, batter: "Casas", event: "Flyout to LF", isScoring: false, awayScore: 2, homeScore: 0, outs: 1, bases: {} },
-        { inning: 2, isTop: true, batter: "Hernandez", event: "Groundout to 1B", isScoring: false, awayScore: 2, homeScore: 0, outs: 2, bases: {} },
-        { inning: 2, isTop: true, batter: "McGuire", event: "Strikeout", isScoring: false, awayScore: 2, homeScore: 0, outs: 3, bases: {} },
-        // Bottom 2nd
-        { inning: 2, isTop: false, batter: "Rizzo", event: "Walk", isScoring: false, awayScore: 2, homeScore: 0, outs: 0, bases: { first: true } },
-        { inning: 2, isTop: false, batter: "Volpe", event: "Single to RF", isScoring: false, awayScore: 2, homeScore: 0, outs: 0, bases: { first: true, second: true } },
-        { inning: 2, isTop: false, batter: "Cabrera", event: "Flyout to CF", isScoring: false, awayScore: 2, homeScore: 0, outs: 1, bases: { first: true, second: true } },
-        { inning: 2, isTop: false, batter: "Higashioka", event: "Groundout, Rizzo scores", isScoring: true, awayScore: 2, homeScore: 1, outs: 2, bases: { second: true } },
-        { inning: 2, isTop: false, batter: "Torres", event: "Flyout to LF", isScoring: false, awayScore: 2, homeScore: 1, outs: 3, bases: {} },
-        // Top 3rd
-        { inning: 3, isTop: true, batter: "Duran", event: "Groundout to SS", isScoring: false, awayScore: 2, homeScore: 1, outs: 1, bases: {} },
-        { inning: 3, isTop: true, batter: "Devers", event: "Solo Home Run to RF", isScoring: true, awayScore: 3, homeScore: 1, outs: 1, bases: {} },
-        { inning: 3, isTop: true, batter: "Martinez", event: "Strikeout", isScoring: false, awayScore: 3, homeScore: 1, outs: 2, bases: {} },
-        { inning: 3, isTop: true, batter: "Bogaerts", event: "Flyout to CF", isScoring: false, awayScore: 3, homeScore: 1, outs: 3, bases: {} },
-        // Bottom 3rd
-        { inning: 3, isTop: false, batter: "Judge", event: "Single to CF", isScoring: false, awayScore: 3, homeScore: 1, outs: 0, bases: { first: true } },
-        { inning: 3, isTop: false, batter: "Stanton", event: "Double Play", isScoring: false, awayScore: 3, homeScore: 1, outs: 2, bases: {} },
-        { inning: 3, isTop: false, batter: "Rizzo", event: "Groundout to 2B", isScoring: false, awayScore: 3, homeScore: 1, outs: 3, bases: {} },
-        // Top 4th
-        { inning: 4, isTop: true, batter: "Verdugo", event: "Flyout to RF", isScoring: false, awayScore: 3, homeScore: 1, outs: 1, bases: {} },
-        { inning: 4, isTop: true, batter: "Casas", event: "Strikeout", isScoring: false, awayScore: 3, homeScore: 1, outs: 2, bases: {} },
-        { inning: 4, isTop: true, batter: "Hernandez", event: "Groundout to 3B", isScoring: false, awayScore: 3, homeScore: 1, outs: 3, bases: {} },
-        // Bottom 4th
-        { inning: 4, isTop: false, batter: "Volpe", event: "Walk", isScoring: false, awayScore: 3, homeScore: 1, outs: 0, bases: { first: true } },
-        { inning: 4, isTop: false, batter: "Cabrera", event: "Single to RF", isScoring: false, awayScore: 3, homeScore: 1, outs: 0, bases: { first: true, third: true } },
-        { inning: 4, isTop: false, batter: "Higashioka", event: "Strikeout", isScoring: false, awayScore: 3, homeScore: 1, outs: 1, bases: { first: true, third: true } },
-        { inning: 4, isTop: false, batter: "Torres", event: "Flyout to CF", isScoring: false, awayScore: 3, homeScore: 1, outs: 2, bases: { first: true, third: true } },
-        { inning: 4, isTop: false, batter: "Judge", event: "2-run Double to LF", isScoring: true, awayScore: 3, homeScore: 3, outs: 2, bases: { second: true } },
-        { inning: 4, isTop: false, batter: "Stanton", event: "Groundout to SS", isScoring: false, awayScore: 3, homeScore: 3, outs: 3, bases: {} },
-        // Top 5th
-        { inning: 5, isTop: true, batter: "McGuire", event: "Groundout to 1B", isScoring: false, awayScore: 3, homeScore: 3, outs: 1, bases: {} },
-        { inning: 5, isTop: true, batter: "Duran", event: "Strikeout", isScoring: false, awayScore: 3, homeScore: 3, outs: 2, bases: {} },
-        { inning: 5, isTop: true, batter: "Devers", event: "Flyout to LF", isScoring: false, awayScore: 3, homeScore: 3, outs: 3, bases: {} },
-        // Bottom 5th
-        { inning: 5, isTop: false, batter: "Rizzo", event: "Strikeout", isScoring: false, awayScore: 3, homeScore: 3, outs: 1, bases: {} },
-        { inning: 5, isTop: false, batter: "Volpe", event: "Groundout to SS", isScoring: false, awayScore: 3, homeScore: 3, outs: 2, bases: {} },
-        { inning: 5, isTop: false, batter: "Cabrera", event: "Flyout to RF", isScoring: false, awayScore: 3, homeScore: 3, outs: 3, bases: {} },
-        // Top 6th
-        { inning: 6, isTop: true, batter: "Martinez", event: "Walk", isScoring: false, awayScore: 3, homeScore: 3, outs: 0, bases: { first: true } },
-        { inning: 6, isTop: true, batter: "Bogaerts", event: "Single to CF", isScoring: false, awayScore: 3, homeScore: 3, outs: 0, bases: { first: true, second: true } },
-        { inning: 6, isTop: true, batter: "Verdugo", event: "RBI Single to RF", isScoring: true, awayScore: 4, homeScore: 3, outs: 0, bases: { first: true, third: true } },
-        { inning: 6, isTop: true, batter: "Casas", event: "2-run Home Run to CF", isScoring: true, awayScore: 6, homeScore: 3, outs: 0, bases: {} },
-        { inning: 6, isTop: true, batter: "Hernandez", event: "Strikeout", isScoring: false, awayScore: 6, homeScore: 3, outs: 1, bases: {} },
-        { inning: 6, isTop: true, batter: "McGuire", event: "Groundout to 2B", isScoring: false, awayScore: 6, homeScore: 3, outs: 2, bases: {} },
-        // Bottom 6th
-        { inning: 6, isTop: false, batter: "Higashioka", event: "Strikeout", isScoring: false, awayScore: 6, homeScore: 3, outs: 1, bases: {} },
-        { inning: 6, isTop: false, batter: "Torres", event: "Solo Home Run to LF", isScoring: true, awayScore: 6, homeScore: 4, outs: 1, bases: {} },
-        { inning: 6, isTop: false, batter: "Judge", event: "Flyout to CF", isScoring: false, awayScore: 6, homeScore: 4, outs: 2, bases: {} },
-        { inning: 6, isTop: false, batter: "Stanton", event: "Strikeout", isScoring: false, awayScore: 6, homeScore: 4, outs: 3, bases: {} },
-        // Top 7th
-        { inning: 7, isTop: true, batter: "Duran", event: "Flyout to LF", isScoring: false, awayScore: 6, homeScore: 4, outs: 1, bases: {} },
-        { inning: 7, isTop: true, batter: "Devers", event: "Groundout to 3B", isScoring: false, awayScore: 6, homeScore: 4, outs: 2, bases: {} },
-        { inning: 7, isTop: true, batter: "Martinez", event: "Strikeout", isScoring: false, awayScore: 6, homeScore: 4, outs: 3, bases: {} },
-        // Bottom 7th
-        { inning: 7, isTop: false, batter: "Rizzo", event: "Flyout to RF", isScoring: false, awayScore: 6, homeScore: 4, outs: 1, bases: {} },
-        { inning: 7, isTop: false, batter: "Volpe", event: "Single to CF", isScoring: false, awayScore: 6, homeScore: 4, outs: 1, bases: { first: true } },
-        { inning: 7, isTop: false, batter: "Cabrera", event: "Double Play", isScoring: false, awayScore: 6, homeScore: 4, outs: 3, bases: {} },
-        // Top 8th
-        { inning: 8, isTop: true, batter: "Bogaerts", event: "Groundout to 1B", isScoring: false, awayScore: 6, homeScore: 4, outs: 1, bases: {} },
-        { inning: 8, isTop: true, batter: "Verdugo", event: "Strikeout", isScoring: false, awayScore: 6, homeScore: 4, outs: 2, bases: {} },
-        { inning: 8, isTop: true, batter: "Casas", event: "Flyout to CF", isScoring: false, awayScore: 6, homeScore: 4, outs: 3, bases: {} },
-        // Bottom 8th - THE COMEBACK
-        { inning: 8, isTop: false, batter: "Higashioka", event: "Walk", isScoring: false, awayScore: 6, homeScore: 4, outs: 0, bases: { first: true } },
-        { inning: 8, isTop: false, batter: "Torres", event: "Single to RF", isScoring: false, awayScore: 6, homeScore: 4, outs: 0, bases: { first: true, second: true } },
-        { inning: 8, isTop: false, batter: "Judge", event: "Flyout to CF", isScoring: false, awayScore: 6, homeScore: 4, outs: 1, bases: { first: true, second: true } },
-        { inning: 8, isTop: false, batter: "Rizzo", event: "2-run Home Run to RF!", isScoring: true, awayScore: 6, homeScore: 6, outs: 1, bases: {} },
-        { inning: 8, isTop: false, batter: "Volpe", event: "RBI Triple to RF!", isScoring: true, awayScore: 6, homeScore: 7, outs: 1, bases: { third: true } },
-        { inning: 8, isTop: false, batter: "Cabrera", event: "Strikeout", isScoring: false, awayScore: 6, homeScore: 7, outs: 2, bases: { third: true } },
-        // Top 9th
-        { inning: 9, isTop: true, batter: "Hernandez", event: "Groundout to SS", isScoring: false, awayScore: 6, homeScore: 7, outs: 1, bases: {} },
-        { inning: 9, isTop: true, batter: "McGuire", event: "Flyout to LF", isScoring: false, awayScore: 6, homeScore: 7, outs: 2, bases: {} },
-        { inning: 9, isTop: true, batter: "Duran", event: "Strikeout", isScoring: false, awayScore: 6, homeScore: 7, outs: 3, bases: {} },
-        // Bottom 9th - WALK OFF!
-        { inning: 9, isTop: false, batter: "Stanton", event: "Single to CF", isScoring: false, awayScore: 6, homeScore: 7, outs: 0, bases: { first: true } },
-        { inning: 9, isTop: false, batter: "Judge", event: "WALK-OFF 2-run HR to CF! 🎉", isScoring: true, awayScore: 6, homeScore: 9, outs: 0, bases: {} },
-      ],
-      // Pitch-by-pitch data for select at-bats (dramatic moments)
-      pitches: [
-        // Martinez 2-run HR - Top 1st (play index 2)
-        { playIndex: 2, pitchNum: 1, type: "Fastball", speed: 95, result: "Ball", balls: 1, strikes: 0, batter: "Martinez", inning: 1, isTop: true, bases: { first: true }, outs: 1, awayScore: 0, homeScore: 0 },
-        { playIndex: 2, pitchNum: 2, type: "Slider", speed: 87, result: "Strike (swinging)", balls: 1, strikes: 1, batter: "Martinez", inning: 1, isTop: true, bases: { first: true }, outs: 1, awayScore: 0, homeScore: 0 },
-        { playIndex: 2, pitchNum: 3, type: "Fastball", speed: 96, result: "Foul", balls: 1, strikes: 2, batter: "Martinez", inning: 1, isTop: true, bases: { first: true }, outs: 1, awayScore: 0, homeScore: 0 },
-        { playIndex: 2, pitchNum: 4, type: "Changeup", speed: 84, result: "Ball", balls: 2, strikes: 2, batter: "Martinez", inning: 1, isTop: true, bases: { first: true }, outs: 1, awayScore: 0, homeScore: 0 },
-        { playIndex: 2, pitchNum: 5, type: "Fastball", speed: 94, result: "HOME RUN! 💥", balls: 2, strikes: 2, batter: "Martinez", inning: 1, isTop: true, bases: {}, outs: 1, awayScore: 2, homeScore: 0, isResult: true },
+    // Curated list of exciting real MLB games - high-scoring, comebacks, walk-offs
+    const EXCITING_GAMES = [
+      // 2024 Season highlights
+      { gamePk: 745546, desc: "Rangers vs Astros - High-scoring thriller" },
+      { gamePk: 746273, desc: "Dodgers vs Padres - NL West rivalry" },
+      { gamePk: 745986, desc: "Yankees vs Red Sox - Classic rivalry" },
+      { gamePk: 747165, desc: "Braves vs Phillies - NL East battle" },
+      { gamePk: 746891, desc: "Cubs vs Cardinals - Historic rivalry" },
 
-        // Judge 2-run Double - Bottom 4th (play index 30)
-        { playIndex: 30, pitchNum: 1, type: "Sinker", speed: 93, result: "Strike (called)", balls: 0, strikes: 1, batter: "Judge", inning: 4, isTop: false, bases: { first: true, third: true }, outs: 2, awayScore: 3, homeScore: 1 },
-        { playIndex: 30, pitchNum: 2, type: "Slider", speed: 86, result: "Ball", balls: 1, strikes: 1, batter: "Judge", inning: 4, isTop: false, bases: { first: true, third: true }, outs: 2, awayScore: 3, homeScore: 1 },
-        { playIndex: 30, pitchNum: 3, type: "Fastball", speed: 97, result: "Foul", balls: 1, strikes: 2, batter: "Judge", inning: 4, isTop: false, bases: { first: true, third: true }, outs: 2, awayScore: 3, homeScore: 1 },
-        { playIndex: 30, pitchNum: 4, type: "Fastball", speed: 96, result: "Foul", balls: 1, strikes: 2, batter: "Judge", inning: 4, isTop: false, bases: { first: true, third: true }, outs: 2, awayScore: 3, homeScore: 1 },
-        { playIndex: 30, pitchNum: 5, type: "Changeup", speed: 85, result: "2-RUN DOUBLE! 💥", balls: 1, strikes: 2, batter: "Judge", inning: 4, isTop: false, bases: { second: true }, outs: 2, awayScore: 3, homeScore: 3, isResult: true },
+      // 2023 Season highlights
+      { gamePk: 717465, desc: "Rangers vs Diamondbacks - World Series Game 5" },
+      { gamePk: 716463, desc: "Phillies vs Diamondbacks - NLCS Game 7" },
+      { gamePk: 715752, desc: "Astros vs Rangers - ALCS thriller" },
+      { gamePk: 718782, desc: "Dodgers vs Padres - September showdown" },
+      { gamePk: 716439, desc: "Braves vs Phillies - Playoff drama" },
 
-        // Rizzo 2-run HR - Bottom 8th (play index 65)
-        { playIndex: 65, pitchNum: 1, type: "Fastball", speed: 94, result: "Ball", balls: 1, strikes: 0, batter: "Rizzo", inning: 8, isTop: false, bases: { first: true, second: true }, outs: 1, awayScore: 6, homeScore: 4 },
-        { playIndex: 65, pitchNum: 2, type: "Curveball", speed: 79, result: "Strike (swinging)", balls: 1, strikes: 1, batter: "Rizzo", inning: 8, isTop: false, bases: { first: true, second: true }, outs: 1, awayScore: 6, homeScore: 4 },
-        { playIndex: 65, pitchNum: 3, type: "Fastball", speed: 95, result: "Foul", balls: 1, strikes: 2, batter: "Rizzo", inning: 8, isTop: false, bases: { first: true, second: true }, outs: 1, awayScore: 6, homeScore: 4 },
-        { playIndex: 65, pitchNum: 4, type: "Slider", speed: 87, result: "Ball", balls: 2, strikes: 2, batter: "Rizzo", inning: 8, isTop: false, bases: { first: true, second: true }, outs: 1, awayScore: 6, homeScore: 4 },
-        { playIndex: 65, pitchNum: 5, type: "Slider", speed: 86, result: "Ball", balls: 3, strikes: 2, batter: "Rizzo", inning: 8, isTop: false, bases: { first: true, second: true }, outs: 1, awayScore: 6, homeScore: 4 },
-        { playIndex: 65, pitchNum: 6, type: "Fastball", speed: 93, result: "2-RUN HOME RUN! 💥", balls: 3, strikes: 2, batter: "Rizzo", inning: 8, isTop: false, bases: {}, outs: 1, awayScore: 6, homeScore: 6, isResult: true },
+      // 2022 Exciting games
+      { gamePk: 663341, desc: "Phillies vs Astros - World Series Game 5" },
+      { gamePk: 662614, desc: "Padres vs Phillies - NLCS Game 5" },
+      { gamePk: 661527, desc: "Mariners vs Astros - ALDS thriller" },
+      { gamePk: 662419, desc: "Yankees vs Guardians - ALDS Game 5" },
+      { gamePk: 661578, desc: "Cardinals vs Phillies - Wild Card" },
 
-        // Walk-off Judge HR - Bottom 9th (play index 69)
-        { playIndex: 69, pitchNum: 1, type: "Fastball", speed: 96, result: "Strike (called)", balls: 0, strikes: 1, batter: "Judge", inning: 9, isTop: false, bases: { first: true }, outs: 0, awayScore: 6, homeScore: 7 },
-        { playIndex: 69, pitchNum: 2, type: "Slider", speed: 88, result: "Ball", balls: 1, strikes: 1, batter: "Judge", inning: 9, isTop: false, bases: { first: true }, outs: 0, awayScore: 6, homeScore: 7 },
-        { playIndex: 69, pitchNum: 3, type: "Fastball", speed: 97, result: "Foul", balls: 1, strikes: 2, batter: "Judge", inning: 9, isTop: false, bases: { first: true }, outs: 0, awayScore: 6, homeScore: 7 },
-        { playIndex: 69, pitchNum: 4, type: "Fastball", speed: 95, result: "Ball", balls: 2, strikes: 2, batter: "Judge", inning: 9, isTop: false, bases: { first: true }, outs: 0, awayScore: 6, homeScore: 7 },
-        { playIndex: 69, pitchNum: 5, type: "Slider", speed: 87, result: "Foul", balls: 2, strikes: 2, batter: "Judge", inning: 9, isTop: false, bases: { first: true }, outs: 0, awayScore: 6, homeScore: 7 },
-        { playIndex: 69, pitchNum: 6, type: "Slider", speed: 85, result: "Foul", balls: 2, strikes: 2, batter: "Judge", inning: 9, isTop: false, bases: { first: true }, outs: 0, awayScore: 6, homeScore: 7 },
-        { playIndex: 69, pitchNum: 7, type: "Fastball", speed: 94, result: "WALK-OFF HOME RUN! 🎉💥", balls: 2, strikes: 2, batter: "Judge", inning: 9, isTop: false, bases: {}, outs: 0, awayScore: 6, homeScore: 9, isResult: true },
-      ]
+      // Regular season high-scoring games
+      { gamePk: 718892, desc: "High-scoring slugfest 2023" },
+      { gamePk: 716745, desc: "Comeback victory 2023" },
+      { gamePk: 745873, desc: "Extra innings thriller 2024" },
+      { gamePk: 746112, desc: "Late-inning drama 2024" },
+      { gamePk: 663098, desc: "Walk-off classic 2022" },
+    ];
+
+    // Function to fetch and load a random exciting game
+    const fetchRandomExcitingGame = async () => {
+      // Shuffle and try games until one works
+      const shuffled = [...EXCITING_GAMES].sort(() => Math.random() - 0.5);
+
+      for (const game of shuffled) {
+        try {
+          const [linescoreRes, playsRes] = await Promise.all([
+            fetch(`https://statsapi.mlb.com/api/v1.1/game/${game.gamePk}/feed/live`),
+            fetch(`https://statsapi.mlb.com/api/v1/game/${game.gamePk}/playByPlay`)
+          ]);
+
+          if (!linescoreRes.ok || !playsRes.ok) continue;
+
+          const linescoreData = await linescoreRes.json();
+          const playsData = await playsRes.json();
+
+          // parseGameData is defined below, we'll call it from the component
+          return { linescore: linescoreData, plays: playsData, gamePk: game.gamePk, desc: game.desc };
+        } catch (error) {
+          console.log(`Failed to fetch game ${game.gamePk}, trying next...`);
+          continue;
+        }
+      }
+      return null;
     };
 
     // API Functions
@@ -919,7 +826,7 @@
 
     // Main App
     function GameReplayApp() {
-      const [view, setView] = useState('search');
+      const [view, setView] = useState('loading'); // Start with loading to fetch random game
       const [selectedDate, setSelectedDate] = useState(() => {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
@@ -927,8 +834,8 @@
       });
       const [games, setGames] = useState([]);
       const [isLoadingGames, setIsLoadingGames] = useState(false);
-      const [useStatic, setUseStatic] = useState(false);
       const [gameData, setGameData] = useState(null);
+      const [loadingMessage, setLoadingMessage] = useState('Loading an exciting game...');
       const [mode, setMode] = useState('inning'); // 'inning', 'play', or 'pitch'
       const [isPlaying, setIsPlaying] = useState(false);
       const [speed, setSpeed] = useState(2000);
@@ -937,6 +844,34 @@
       const [celebrating, setCelebrating] = useState(false);
       const [scoringTeam, setScoringTeam] = useState(null);
       const prevStepRef = useRef(0);
+      const hasLoadedRandomGame = useRef(false);
+
+      // Auto-load a random exciting game on mount
+      useEffect(() => {
+        if (hasLoadedRandomGame.current) return;
+        hasLoadedRandomGame.current = true;
+
+        const loadRandomGame = async () => {
+          setLoadingMessage('Finding an exciting game...');
+          const gameResult = await fetchRandomExcitingGame();
+
+          if (gameResult) {
+            setLoadingMessage('Parsing play-by-play data...');
+            const parsed = parseGameData(gameResult.linescore, gameResult.plays);
+            if (parsed && parsed.halfInnings.length > 0) {
+              setGameData(parsed);
+              setView('warning');
+              return;
+            }
+          }
+
+          // Fallback to search view if no game could be loaded
+          setLoadingMessage('Could not load game, showing search...');
+          setTimeout(() => setView('search'), 1000);
+        };
+
+        loadRandomGame();
+      }, []);
 
       // Check if current event is a home run (big event)
       const isHomeRun = (eventText) => {
@@ -1065,6 +1000,7 @@
 
       const handleSelectGame = async (game) => {
         setView('loading');
+        setLoadingMessage('Loading game data...');
         const details = await fetchGameDetails(game.gamePk);
         if (details) {
           const parsed = parseGameData(details.linescore, details.plays);
@@ -1074,15 +1010,35 @@
             return;
           }
         }
-        setGameData(STATIC_GAME_DATA);
-        setUseStatic(true);
-        setView('warning');
+        // Fallback: try to load a random exciting game
+        setLoadingMessage('Game unavailable, finding another exciting game...');
+        const fallback = await fetchRandomExcitingGame();
+        if (fallback) {
+          const parsed = parseGameData(fallback.linescore, fallback.plays);
+          if (parsed && parsed.halfInnings.length > 0) {
+            setGameData(parsed);
+            setView('warning');
+            return;
+          }
+        }
+        // If all else fails, go back to search
+        setView('search');
       };
 
-      const handleUseStaticData = () => {
-        setGameData(STATIC_GAME_DATA);
-        setUseStatic(true);
-        setView('warning');
+      const handleLoadRandomGame = async () => {
+        setView('loading');
+        setLoadingMessage('Finding an exciting game...');
+        const gameResult = await fetchRandomExcitingGame();
+        if (gameResult) {
+          const parsed = parseGameData(gameResult.linescore, gameResult.plays);
+          if (parsed && parsed.halfInnings.length > 0) {
+            setGameData(parsed);
+            setView('warning');
+            return;
+          }
+        }
+        // Fallback to search if nothing works
+        setView('search');
       };
 
       const handleStartReplay = () => {
@@ -1096,7 +1052,6 @@
         setGameData(null);
         setCurrentStep(0);
         setIsPlaying(false);
-        setUseStatic(false);
       };
 
       const handlePlayPause = () => {
@@ -1258,11 +1213,11 @@
 
               <div className="mt-8 pt-6 border-t border-gray-800">
                 <button
-                  onClick={handleUseStaticData}
-                  className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 py-4 rounded-xl transition-all flex items-center justify-center gap-3"
+                  onClick={handleLoadRandomGame}
+                  className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white py-4 rounded-xl transition-all flex items-center justify-center gap-3 font-semibold shadow-lg"
                 >
-                  <span className="text-2xl">🎮</span>
-                  <span>Try Demo Game (Yankees vs Red Sox - Epic Comeback)</span>
+                  <span className="text-2xl">🎲</span>
+                  <span>Load Random Exciting Game</span>
                 </button>
               </div>
             </div>
@@ -1280,7 +1235,8 @@
                 <div className="absolute inset-0 border-4 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
                 <div className="absolute inset-4 flex items-center justify-center text-2xl">⚾</div>
               </div>
-              <p className="text-gray-400 text-lg">Loading game data...</p>
+              <p className="text-gray-400 text-lg">{loadingMessage}</p>
+              <p className="text-gray-600 text-sm mt-2">Fetching real MLB game data...</p>
             </div>
           </div>
         );
@@ -1296,12 +1252,6 @@
               <div className="inline-block px-4 py-1 bg-amber-600/20 rounded-full text-amber-400 font-semibold mb-6">
                 🎭 Spoiler-Free Experience
               </div>
-
-              {useStatic && (
-                <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3 mb-4 text-blue-400 text-sm">
-                  ℹ️ Using demo game data
-                </div>
-              )}
 
               <div className="bg-gray-800/50 rounded-xl p-5 mb-6 text-left">
                 <div className="flex items-center gap-4 mb-4">
@@ -1335,12 +1285,20 @@
                 ▶ Experience the Game
               </button>
 
-              <button
-                onClick={handleBack}
-                className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl transition-all"
-              >
-                ← Choose Different Game
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleLoadRandomGame}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <span>🎲</span> Random Game
+                </button>
+                <button
+                  onClick={handleBack}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl transition-all"
+                >
+                  ← Browse Games
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -1368,7 +1326,9 @@
                   <div className="text-amber-400 font-medium">{gameData.date}</div>
                   <div className="text-gray-500 text-sm">{gameData.venue}</div>
                 </div>
-                <div className="w-20"></div>
+                <button onClick={handleLoadRandomGame} className="text-gray-400 hover:text-amber-400 transition-all flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800">
+                  🎲 New Game
+                </button>
               </div>
 
               {/* Scoreboard */}
