@@ -414,43 +414,48 @@
               third: currentBases.third
             };
 
-            // Parse runners on base after play using cumulative tracking
-            // First, process all runner movements to update base state
+            // Parse runners on base after play by tracking each runner's FINAL position.
+            // The API can list multiple movements per runner (e.g. batter: null→1B, then 1B→2B).
+            // Using vacated/occupied sets gets this wrong because intermediate positions
+            // appear both vacated and occupied. Instead, track final position per runner ID.
             const basesAfterPlay = { first: false, second: false, third: false };
 
             if (play.runners && play.runners.length > 0) {
-              // Track which bases were vacated and which are now occupied
-              const vacated = new Set();
-              const occupied = new Set();
+              const runnerFinalPos = {};
+              const basesInvolved = new Set();
 
               play.runners.forEach(runner => {
                 const start = runner.movement?.start;
                 const end = runner.movement?.end;
                 const isOut = runner.movement?.isOut;
+                const runnerId = runner.details?.runner?.id || `anon_${start}_${end}`;
 
-                // Mark starting base as vacated (runner left this base)
+                // Track which bases had a runner leave
                 if (start && start !== 'batter') {
-                  vacated.add(start);
+                  basesInvolved.add(start);
                 }
 
-                // Mark ending base as occupied (unless runner scored or is out)
-                if (end && !isOut) {
-                  if (end === '1B') occupied.add('1B');
-                  else if (end === '2B') occupied.add('2B');
-                  else if (end === '3B') occupied.add('3B');
-                  // 'score' or '4B' means they scored, not on base
+                // Update this runner's final position (later entries override earlier)
+                if (isOut) {
+                  runnerFinalPos[runnerId] = null;
+                } else if (end === 'score' || end === '4B') {
+                  runnerFinalPos[runnerId] = null;
+                } else if (end) {
+                  runnerFinalPos[runnerId] = end;
                 }
               });
 
-              // Start with current bases, remove vacated, add newly occupied
-              if (currentBases.first && !vacated.has('1B')) basesAfterPlay.first = true;
-              if (currentBases.second && !vacated.has('2B')) basesAfterPlay.second = true;
-              if (currentBases.third && !vacated.has('3B')) basesAfterPlay.third = true;
+              // Preserve runners on bases not involved in this play
+              if (currentBases.first && !basesInvolved.has('1B')) basesAfterPlay.first = true;
+              if (currentBases.second && !basesInvolved.has('2B')) basesAfterPlay.second = true;
+              if (currentBases.third && !basesInvolved.has('3B')) basesAfterPlay.third = true;
 
-              // Add newly occupied bases
-              if (occupied.has('1B')) basesAfterPlay.first = true;
-              if (occupied.has('2B')) basesAfterPlay.second = true;
-              if (occupied.has('3B')) basesAfterPlay.third = true;
+              // Place runners at their final positions
+              Object.values(runnerFinalPos).forEach(pos => {
+                if (pos === '1B') basesAfterPlay.first = true;
+                else if (pos === '2B') basesAfterPlay.second = true;
+                else if (pos === '3B') basesAfterPlay.third = true;
+              });
             } else {
               // No runner data, keep current state (shouldn't happen often)
               basesAfterPlay.first = currentBases.first;
