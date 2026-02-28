@@ -858,7 +858,7 @@
     const SpeedButton = ({ speed, currentSpeed, onClick, label }) => (
       <button
         onClick={() => onClick(speed)}
-        className={`px-4 py-2 rounded-lg font-medium transition-all ${currentSpeed === speed ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+        className={`px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium text-xs sm:text-base transition-all ${currentSpeed === speed ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
       >
         {label}
       </button>
@@ -1245,7 +1245,7 @@
       // Search View
       if (view === 'search') {
         return (
-          <div className="min-h-screen bg-gray-950 p-4 md:p-8">
+          <div className="min-h-screen bg-gray-950 p-2 sm:p-4 md:p-8">
             <div className="max-w-2xl mx-auto">
               <div className="text-center mb-8">
                 <div className="text-7xl mb-4">⚾</div>
@@ -1386,31 +1386,57 @@
         const filteredPlays = getFilteredPlays();
 
         return (
-          <div className="min-h-screen bg-gray-950 p-4 md:p-8">
+          <div className="min-h-screen bg-gray-950 p-2 sm:p-4 md:p-8">
             <div className="max-w-4xl mx-auto">
               {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <button onClick={handleBack} className="text-gray-400 hover:text-white transition-all flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800">
+              <div className="flex items-center justify-between mb-2 sm:mb-6">
+                <button onClick={handleBack} className="text-gray-400 hover:text-white transition-all flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg hover:bg-gray-800">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  Back
+                  <span className="hidden sm:inline">Back</span>
                 </button>
                 <div className="text-center">
-                  <div className="text-amber-400 font-medium">{gameData.date}</div>
-                  <div className="text-gray-500 text-sm">{gameData.venue}</div>
+                  <div className="text-amber-400 font-medium text-sm sm:text-base">{gameData.date}</div>
+                  <div className="text-gray-500 text-xs sm:text-sm hidden sm:block">{gameData.venue}</div>
                 </div>
-                <button onClick={handleLoadRandomGame} className="text-gray-400 hover:text-amber-400 transition-all flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-800">
-                  🎲 New Game
+                <button onClick={handleLoadRandomGame} className="text-gray-400 hover:text-amber-400 transition-all flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg hover:bg-gray-800 text-sm sm:text-base">
+                  🎲 <span className="hidden sm:inline">New Game</span>
                 </button>
               </div>
 
-              {/* Scoreboard */}
-              <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-2xl overflow-hidden shadow-2xl border border-gray-800 mb-6">
-                <div className="bg-gradient-to-r from-gray-800 via-gray-850 to-gray-800 p-4 flex items-center justify-between border-b border-gray-700">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">⚾</span>
-                    <h2 className="text-white font-bold tracking-widest">SCOREBOARD</h2>
+              {/* Mode Toggle */}
+              <div className="flex justify-center gap-1 sm:gap-2 mb-2 sm:mb-4">
+                <button onClick={() => handleModeChange('inning')} className={`px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-base font-medium transition-all ${mode === 'inning' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                  📊 Inning
+                </button>
+                <button onClick={() => handleModeChange('play')} className={`px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-base font-medium transition-all ${mode === 'play' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                  ⚡ Play-by-Play
+                </button>
+                {gameData.pitches && gameData.pitches.length > 0 && (
+                  <button onClick={() => handleModeChange('pitch')} className={`px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-base font-medium transition-all ${mode === 'pitch' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                    🎯 Pitch
+                  </button>
+                )}
+              </div>
+
+              {/* Compact status line for play/pitch modes */}
+              {mode !== 'inning' && (
+                <div className="flex items-center justify-center gap-2 mb-2 sm:mb-4 px-3 py-1 sm:py-2 rounded-full bg-gray-900 border border-gray-800 w-fit mx-auto">
+                  <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : isGameOver ? 'bg-amber-500' : 'bg-gray-500'}`}></div>
+                  <span className={`text-sm font-medium ${isGameOver ? 'text-amber-400' : 'text-gray-400'}`}>
+                    {isGameOver ? '🏆 FINAL' : isPlaying ? 'LIVE' : 'PAUSED'}
+                  </span>
+                </div>
+              )}
+
+              {/* Scoreboard - only shown in Half-Inning mode */}
+              {mode === 'inning' && (
+              <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-2xl overflow-hidden shadow-2xl border border-gray-800 mb-3 sm:mb-6">
+                <div className="bg-gradient-to-r from-gray-800 via-gray-850 to-gray-800 p-2 sm:p-4 flex items-center justify-between border-b border-gray-700">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="text-lg sm:text-2xl">⚾</span>
+                    <h2 className="text-white font-bold tracking-widest text-sm sm:text-base">SCOREBOARD</h2>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-900/50">
                     <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : isGameOver ? 'bg-amber-500' : 'bg-gray-500'}`}></div>
@@ -1421,23 +1447,23 @@
                 </div>
 
                 {/* Big Score */}
-                <div className="p-8 bg-gradient-to-b from-gray-900 to-gray-950">
-                  <div className="flex items-center justify-center gap-8 md:gap-16">
-                    <div className={`text-center transition-all ${isGameOver && winner === 'away' ? 'winning-glow rounded-xl p-4' : ''}`}>
-                      <div className="text-3xl font-bold mb-3" style={{ color: gameData.awayTeam.color }}>{gameData.awayTeam.abbreviation}</div>
+                <div className="p-3 sm:p-8 bg-gradient-to-b from-gray-900 to-gray-950">
+                  <div className="flex items-center justify-center gap-4 sm:gap-8 md:gap-16">
+                    <div className={`text-center transition-all ${isGameOver && winner === 'away' ? 'winning-glow rounded-xl p-2 sm:p-4' : ''}`}>
+                      <div className="text-xl sm:text-3xl font-bold mb-1 sm:mb-3" style={{ color: gameData.awayTeam.color }}>{gameData.awayTeam.abbreviation}</div>
                       <ScoreDisplay score={scores.away} />
                       {isGameOver && winner === 'away' && <div className="mt-3 text-green-400 text-sm font-bold">🏆 WINNER</div>}
                     </div>
                     <div className="text-center">
-                      <div className="text-gray-600 text-5xl font-light">—</div>
+                      <div className="text-gray-600 text-3xl sm:text-5xl font-light">—</div>
                       {currentStep > 0 && !isGameOver && currentHalfInning && (
                         <div className="text-amber-400 text-sm mt-3 bg-amber-900/30 px-3 py-1 rounded-full">
                           {currentHalfInning.isTop ? '▲' : '▼'} {currentHalfInning.inning}{getOrdinalSuffix(currentHalfInning.inning)}
                         </div>
                       )}
                     </div>
-                    <div className={`text-center transition-all ${isGameOver && winner === 'home' ? 'winning-glow rounded-xl p-4' : ''}`}>
-                      <div className="text-3xl font-bold mb-3" style={{ color: gameData.homeTeam.color }}>{gameData.homeTeam.abbreviation}</div>
+                    <div className={`text-center transition-all ${isGameOver && winner === 'home' ? 'winning-glow rounded-xl p-2 sm:p-4' : ''}`}>
+                      <div className="text-xl sm:text-3xl font-bold mb-1 sm:mb-3" style={{ color: gameData.homeTeam.color }}>{gameData.homeTeam.abbreviation}</div>
                       <ScoreDisplay score={scores.home} />
                       {isGameOver && winner === 'home' && <div className="mt-3 text-green-400 text-sm font-bold">🏆 WINNER</div>}
                     </div>
@@ -1498,10 +1524,11 @@
                   </div>
                 )}
               </div>
+              )}
 
               {/* Play-by-Play with Score Bug */}
               {mode === 'play' && currentStep > 0 && (
-                <div className="bg-gray-900 rounded-2xl p-4 mb-6 border border-gray-800 relative overflow-hidden">
+                <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-2 sm:p-4 mb-2 sm:mb-6 border border-gray-800 relative overflow-hidden">
                   {/* Fireworks overlay */}
                   <Fireworks active={celebrating} duration={2500} />
 
@@ -1520,7 +1547,7 @@
                             </div>
                           </div>
                         )}
-                        <div className="flex justify-center mb-4 relative z-10">
+                        <div className="flex justify-center mb-2 sm:mb-4 relative z-10">
                           <DiamondScoreBug
                             bases={currentPlay.bases || {}}
                             outs={currentPlay.outs || 0}
@@ -1586,7 +1613,7 @@
                       {scoringPlaysOnly ? '✓ Scoring Only' : 'Show All'}
                     </button>
                   </div>
-                  <div className="max-h-40 overflow-y-auto">
+                  <div className="max-h-24 sm:max-h-40 overflow-y-auto">
                     {filteredPlays.slice(0, currentStep).reverse().map((play, i) => (
                       <PlayCard
                         key={i}
@@ -1600,24 +1627,9 @@
                 </div>
               )}
 
-              {/* Mode Toggle */}
-              <div className="flex justify-center gap-2 mb-4 flex-wrap">
-                <button onClick={() => handleModeChange('inning')} className={`px-5 py-2.5 rounded-xl font-medium transition-all ${mode === 'inning' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-                  📊 Half-Inning
-                </button>
-                <button onClick={() => handleModeChange('play')} className={`px-5 py-2.5 rounded-xl font-medium transition-all ${mode === 'play' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-                  ⚡ Play-by-Play
-                </button>
-                {gameData.pitches && gameData.pitches.length > 0 && (
-                  <button onClick={() => handleModeChange('pitch')} className={`px-5 py-2.5 rounded-xl font-medium transition-all ${mode === 'pitch' ? 'bg-amber-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-                    🎯 Pitch-by-Pitch
-                  </button>
-                )}
-              </div>
-
               {/* Pitch-by-Pitch View */}
               {mode === 'pitch' && gameData.pitches && currentStep > 0 && (
-                <div className="bg-gray-900 rounded-2xl p-4 mb-6 border border-gray-800 relative overflow-hidden">
+                <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-2 sm:p-4 mb-2 sm:mb-6 border border-gray-800 relative overflow-hidden">
                   {/* Fireworks overlay */}
                   <Fireworks active={celebrating} duration={2500} />
 
@@ -1638,7 +1650,7 @@
                         )}
 
                         {/* Score Bug with Count */}
-                        <div className="flex justify-center mb-4 relative z-10">
+                        <div className="flex justify-center mb-2 sm:mb-4 relative z-10">
                           <DiamondScoreBug
                             bases={currentPitch.bases || {}}
                             outs={currentPitch.outs || 0}
@@ -1657,13 +1669,13 @@
                         </div>
 
                         {/* Current At-Bat Info */}
-                        <div className="text-center mb-4">
-                          <div className="text-gray-400 text-sm">Now Batting</div>
-                          <div className="text-white text-xl font-bold">{currentPitch.batter}</div>
+                        <div className="text-center mb-2 sm:mb-4">
+                          <div className="text-gray-400 text-xs sm:text-sm">Now Batting</div>
+                          <div className="text-white text-base sm:text-xl font-bold">{currentPitch.batter}</div>
                         </div>
 
                         {/* Pitch Info */}
-                        <div className={`p-4 rounded-xl border-2 transition-all ${(currentPitch.isFinal || currentPitch.isResult) ? 'border-amber-500 bg-amber-900/20' : 'border-gray-700 bg-gray-800/50'}`}>
+                        <div className={`p-2 sm:p-4 rounded-xl border-2 transition-all ${(currentPitch.isFinal || currentPitch.isResult) ? 'border-amber-500 bg-amber-900/20' : 'border-gray-700 bg-gray-800/50'}`}>
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-gray-400">Pitch #{currentPitch.pitchNum}</span>
                             <span className="text-amber-400 font-mono font-bold">{currentPitch.balls}-{currentPitch.strikes}</span>
@@ -1686,8 +1698,8 @@
                         </div>
 
                         {/* Pitch sequence for this at-bat */}
-                        <div className="mt-4">
-                          <div className="text-gray-500 text-xs mb-2">Pitch Sequence</div>
+                        <div className="mt-2 sm:mt-4">
+                          <div className="text-gray-500 text-xs mb-1 sm:mb-2">Pitch Sequence</div>
                           <div className="flex gap-1 flex-wrap">
                             {gameData.pitches
                               .filter(p => p.playIndex === currentPitch.playIndex)
@@ -1727,7 +1739,7 @@
 
               {/* Scoring plays filter toggle in play mode */}
               {mode === 'play' && (
-                <div className="flex justify-center mb-4">
+                <div className="flex justify-center mb-2 sm:mb-4">
                   <button
                     onClick={() => {
                         setIsPlaying(false);
@@ -1774,10 +1786,10 @@
               )}
 
               {/* Controls */}
-              <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
-                <div className="mb-6">
-                  <div className="text-gray-400 text-sm mb-3 text-center font-medium">⏱ PLAYBACK SPEED</div>
-                  <div className="flex justify-center gap-2 flex-wrap">
+              <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-3 sm:p-6 border border-gray-800">
+                <div className="mb-3 sm:mb-6">
+                  <div className="text-gray-400 text-xs sm:text-sm mb-2 sm:mb-3 text-center font-medium">⏱ PLAYBACK SPEED</div>
+                  <div className="flex justify-center gap-1 sm:gap-2 flex-wrap">
                     <SpeedButton speed={4000} currentSpeed={speed} onClick={setSpeed} label="🐢 Slow" />
                     <SpeedButton speed={2000} currentSpeed={speed} onClick={setSpeed} label="Normal" />
                     <SpeedButton speed={800} currentSpeed={speed} onClick={setSpeed} label="🐇 Fast" />
@@ -1785,31 +1797,31 @@
                   </div>
                 </div>
 
-                <div className="flex justify-center gap-3">
-                  <button onClick={handleReset} className="p-3 bg-gray-700 hover:bg-gray-600 rounded-xl transition-all" title="Reset">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                <div className="flex justify-center gap-2 sm:gap-3">
+                  <button onClick={handleReset} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-lg sm:rounded-xl transition-all" title="Reset">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   </button>
-                  <button onClick={() => currentStep > 0 && setCurrentStep(prev => prev - 1)} disabled={currentStep === 0} className="p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  <button onClick={() => currentStep > 0 && setCurrentStep(prev => prev - 1)} disabled={currentStep === 0} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg sm:rounded-xl transition-all">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                   </button>
-                  <button onClick={handlePlayPause} className="p-4 bg-amber-600 hover:bg-amber-500 rounded-xl transition-all shadow-lg transform hover:scale-105">
+                  <button onClick={handlePlayPause} className="p-3 sm:p-4 bg-amber-600 hover:bg-amber-500 rounded-lg sm:rounded-xl transition-all shadow-lg transform hover:scale-105">
                     {isPlaying ? (
-                      <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     ) : (
-                      <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     )}
                   </button>
-                  <button onClick={() => currentStep < maxSteps && setCurrentStep(prev => prev + 1)} disabled={currentStep >= maxSteps} className="p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  <button onClick={() => currentStep < maxSteps && setCurrentStep(prev => prev + 1)} disabled={currentStep >= maxSteps} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg sm:rounded-xl transition-all">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   </button>
-                  <button onClick={() => { setIsPlaying(false); setCurrentStep(maxSteps); }} className="p-3 bg-gray-700 hover:bg-gray-600 rounded-xl transition-all" title="Skip to end">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+                  <button onClick={() => { setIsPlaying(false); setCurrentStep(maxSteps); }} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-lg sm:rounded-xl transition-all" title="Skip to end">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
                   </button>
                 </div>
 
               </div>
 
-              <div className="text-center mt-6 text-gray-600 text-sm">
+              <div className="text-center mt-3 sm:mt-6 text-gray-600 text-xs sm:text-sm">
                 ⚾ Game Replay • Experience the drama without spoilers
               </div>
             </div>
