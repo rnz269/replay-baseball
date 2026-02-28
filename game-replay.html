@@ -375,7 +375,7 @@
             // Count actual runners who scored on this play by checking runner movements.
             // Don't rely on isScoringPlay - the API can mark it false even when runs score
             // (e.g. runs scoring on wild pitches/passed balls during a strikeout at-bat).
-            let runsScored = 0;
+            let totalRunsScored = 0;
             if (play.runners) {
               const scoredRunnerIds = new Set();
               play.runners.forEach(runner => {
@@ -386,19 +386,16 @@
                   if (runnerId) {
                     scoredRunnerIds.add(runnerId);
                   } else {
-                    runsScored++;
+                    totalRunsScored++;
                   }
                 }
               });
-              runsScored += scoredRunnerIds.size;
+              totalRunsScored += scoredRunnerIds.size;
             }
-            const isScoring = runsScored > 0 || (play.about?.isScoringPlay || false);
-            // Fallback: if API says scoring but we found no runners, use rbi
-            if (isScoring && runsScored === 0) runsScored = play.result.rbi || 1;
-            if (runsScored > 0) {
-              if (isTop) currentAwayScore += runsScored;
-              else currentHomeScore += runsScored;
-            }
+            const isAnyScoring = totalRunsScored > 0 || (play.about?.isScoringPlay || false);
+            if (isAnyScoring && totalRunsScored === 0) totalRunsScored = play.result.rbi || 1;
+            // NOTE: Don't update cumulative score here — it's split below between
+            // mid-at-bat actions and the at-bat result itself.
 
             const batter = play.matchup?.batter?.fullName?.split(' ').pop() || 'Unknown';
             const batterFull = play.matchup?.batter?.fullName || 'Unknown';
@@ -466,6 +463,55 @@
             // Update current bases for next play
             currentBases = { ...basesAfterPlay };
             const bases = basesAfterPlay;
+
+            // Check for mid-at-bat scoring actions (wild pitches, passed balls, etc.)
+            // These are action events in playEvents where runners scored BEFORE the at-bat ended.
+            // We create separate play entries for them so the user sees how runs actually scored.
+            let midAtBatRuns = 0;
+            if (play.playEvents && play.runners && totalRunsScored > 0) {
+              play.playEvents.forEach((evt, evtIndex) => {
+                if (evt.type === 'action' && !evt.isPitch) {
+                  const scoredOnAction = new Set();
+                  play.runners.forEach(runner => {
+                    if (runner.details?.playIndex === evtIndex &&
+                        !runner.movement?.isOut &&
+                        (runner.movement?.end === 'score' || runner.movement?.end === '4B')) {
+                      const rid = runner.details?.runner?.id;
+                      if (rid) scoredOnAction.add(rid);
+                    }
+                  });
+
+                  if (scoredOnAction.size > 0) {
+                    const actionRuns = scoredOnAction.size;
+                    midAtBatRuns += actionRuns;
+                    if (isTop) currentAwayScore += actionRuns;
+                    else currentHomeScore += actionRuns;
+
+                    plays.push({
+                      inning: play.about.inning,
+                      isTop: isTop,
+                      batter: batter,
+                      event: evt.details?.event || 'Action',
+                      description: evt.details?.description,
+                      isScoring: true,
+                      isMidAtBatAction: true,
+                      awayScore: currentAwayScore,
+                      homeScore: currentHomeScore,
+                      outs: evt.count?.outs ?? 0,
+                      bases: { ...basesBeforePlay }
+                    });
+                  }
+                }
+              });
+            }
+
+            // Update score for runs on the at-bat result itself (excluding mid-at-bat actions)
+            const atBatRuns = totalRunsScored - midAtBatRuns;
+            if (atBatRuns > 0) {
+              if (isTop) currentAwayScore += atBatRuns;
+              else currentHomeScore += atBatRuns;
+            }
+            const isScoring = atBatRuns > 0;
 
             // Parse pitch-by-pitch data from playEvents
             let pitchNum = 0;
@@ -785,7 +831,11 @@
                 {play.isScoring && <span className="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded">SCORING</span>}
               </div>
               <p className={`mt-1 ${play.isScoring ? 'text-white font-medium' : 'text-gray-400'}`}>
-                <span className="font-semibold">{play.batter}</span>: {play.event}
+                {play.isMidAtBatAction ? (
+                  <span>{play.description || play.event}</span>
+                ) : (
+                  <span><span className="font-semibold">{play.batter}</span>: {play.event}</span>
+                )}
               </p>
             </div>
             <div className="text-right ml-3">
