@@ -159,10 +159,26 @@ const parseGameData = (gameData, playsData) => {
         const batter = play.matchup?.batter?.fullName || 'Unknown';
         const eventType = play.result.event;
 
+        // For runner events, show the runner's name instead of the batter
+        const runnerEventKeywords = ['Caught Stealing', 'Stolen Base', 'Picked Off', 'Pickoff'];
+        let displayName = batter;
+        if (runnerEventKeywords.some(kw => eventType.includes(kw)) && play.runners) {
+          for (const runner of play.runners) {
+            const runnerEvt = runner.details?.event || '';
+            if (runnerEventKeywords.some(kw => runnerEvt.includes(kw))) {
+              const runnerFullName = runner.details?.runner?.fullName;
+              if (runnerFullName) {
+                displayName = runnerFullName;
+                break;
+              }
+            }
+          }
+        }
+
         scoringPlays.push({
           inning: play.about.inning,
           half: isTop ? "top" : "bottom",
-          event: `${eventType} by ${batter}`,
+          event: `${eventType} by ${displayName}`,
           awayScore: currentAwayScore,
           homeScore: currentHomeScore
         });

@@ -559,10 +559,27 @@
               }
             }
 
+            // For runner events (caught stealing, stolen base, etc.), show the runner's name
+            const runnerEventKeywords = ['Caught Stealing', 'Stolen Base', 'Picked Off', 'Pickoff'];
+            const resultEvent = play.result?.event || '';
+            let displayBatter = batter;
+            if (runnerEventKeywords.some(kw => resultEvent.includes(kw)) && play.runners) {
+              for (const runner of play.runners) {
+                const runnerEvt = runner.details?.event || '';
+                if (runnerEventKeywords.some(kw => runnerEvt.includes(kw))) {
+                  const runnerFullName = runner.details?.runner?.fullName;
+                  if (runnerFullName) {
+                    displayBatter = runnerFullName.split(' ').pop();
+                    break;
+                  }
+                }
+              }
+            }
+
             plays.push({
               inning: play.about.inning,
               isTop: isTop,
-              batter: batter,
+              batter: displayBatter,
               event: play.result.event,
               isScoring: isScoring,
               awayScore: currentAwayScore,
