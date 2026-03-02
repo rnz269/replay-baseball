@@ -559,10 +559,27 @@
               }
             }
 
+            // For runner events (caught stealing, stolen base, etc.), show the runner's name
+            const runnerEventKeywords = ['Caught Stealing', 'Stolen Base', 'Picked Off', 'Pickoff'];
+            const resultEvent = play.result?.event || '';
+            let displayBatter = batter;
+            if (runnerEventKeywords.some(kw => resultEvent.includes(kw)) && play.runners) {
+              for (const runner of play.runners) {
+                const runnerEvt = runner.details?.event || '';
+                if (runnerEventKeywords.some(kw => runnerEvt.includes(kw))) {
+                  const runnerFullName = runner.details?.runner?.fullName;
+                  if (runnerFullName) {
+                    displayBatter = runnerFullName.split(' ').pop();
+                    break;
+                  }
+                }
+              }
+            }
+
             plays.push({
               inning: play.about.inning,
               isTop: isTop,
-              batter: batter,
+              batter: displayBatter,
               event: play.result.event,
               isScoring: isScoring,
               awayScore: currentAwayScore,
@@ -641,7 +658,7 @@
 
         return (
           <div
-            className={`absolute w-5 h-5 border-2 transition-all duration-300 ${
+            className={`absolute w-6 h-6 border-2 transition-all duration-300 ${
               occupied
                 ? 'bg-amber-400 border-amber-500 shadow-lg shadow-amber-400/50'
                 : 'bg-gray-700 border-gray-600'
@@ -654,37 +671,37 @@
       return (
         <div
           key={animationKey}
-          className={`bg-gray-900/95 rounded-xl border p-3 shadow-xl backdrop-blur-sm transition-all ${
+          className={`bg-gray-900/95 rounded-xl border p-4 sm:p-5 shadow-xl backdrop-blur-sm transition-all ${
             celebrating
               ? 'dance-celebrate border-amber-500 shadow-amber-500/30'
               : 'border-gray-700'
           }`}
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 sm:gap-6">
             {/* Teams and Score */}
-            <div className="flex flex-col gap-1 min-w-[100px]">
-              <div className={`flex items-center justify-between text-sm ${isTop ? 'text-white' : 'text-gray-400'}`}>
-                <div className="flex items-center gap-1">
-                  <TeamLogo teamId={awayTeam.id} abbreviation={awayTeam.abbreviation} color={awayTeam.color} size="xs" />
-                  <span className="font-bold text-xs" style={{ color: awayTeam.color }}>{awayTeam.abbreviation}</span>
+            <div className="flex flex-col gap-1.5 min-w-[130px]">
+              <div className={`flex items-center justify-between ${isTop ? 'text-white' : 'text-gray-400'}`}>
+                <div className="flex items-center gap-1.5">
+                  <TeamLogo teamId={awayTeam.id} abbreviation={awayTeam.abbreviation} color={awayTeam.color} size="sm" />
+                  <span className="font-bold text-sm" style={{ color: awayTeam.color }}>{awayTeam.abbreviation}</span>
                 </div>
-                <span className={`font-mono font-bold ml-3 ${celebrating && scoringTeam === 'away' ? 'score-celebrate' : ''}`}>{awayScore}</span>
+                <span className={`font-mono font-bold text-lg ml-3 ${celebrating && scoringTeam === 'away' ? 'score-celebrate' : ''}`}>{awayScore}</span>
               </div>
-              <div className={`flex items-center justify-between text-sm ${!isTop ? 'text-white' : 'text-gray-400'}`}>
-                <div className="flex items-center gap-1">
-                  <TeamLogo teamId={homeTeam.id} abbreviation={homeTeam.abbreviation} color={homeTeam.color} size="xs" />
-                  <span className="font-bold text-xs" style={{ color: homeTeam.color }}>{homeTeam.abbreviation}</span>
+              <div className={`flex items-center justify-between ${!isTop ? 'text-white' : 'text-gray-400'}`}>
+                <div className="flex items-center gap-1.5">
+                  <TeamLogo teamId={homeTeam.id} abbreviation={homeTeam.abbreviation} color={homeTeam.color} size="sm" />
+                  <span className="font-bold text-sm" style={{ color: homeTeam.color }}>{homeTeam.abbreviation}</span>
                 </div>
-                <span className={`font-mono font-bold ml-3 ${celebrating && scoringTeam === 'home' ? 'score-celebrate' : ''}`}>{homeScore}</span>
+                <span className={`font-mono font-bold text-lg ml-3 ${celebrating && scoringTeam === 'home' ? 'score-celebrate' : ''}`}>{homeScore}</span>
               </div>
             </div>
 
             {/* Diamond */}
-            <div className="relative w-16 h-16">
+            <div className="relative w-20 h-20">
               {/* Diamond outline */}
               <div className="absolute inset-2 border-2 border-gray-600 rotate-45 bg-gray-800/50"></div>
               {/* Home plate */}
-              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-gray-500 rotate-45"></div>
+              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-gray-500 rotate-45"></div>
               {/* Bases */}
               <BaseShape position="first" occupied={bases?.first} />
               <BaseShape position="second" occupied={bases?.second} />
@@ -693,7 +710,7 @@
 
             {/* Inning, Outs, and Count */}
             <div className="flex flex-col items-center gap-1">
-              <div className="text-amber-400 font-bold text-sm">
+              <div className="text-amber-400 font-bold text-lg">
                 {isTop ? '▲' : '▼'} {inning}
               </div>
 
@@ -706,7 +723,7 @@
                       {[0, 1, 2, 3].map(i => (
                         <div
                           key={i}
-                          className={`w-2 h-2 rounded-full transition-all ${
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${
                             i < (balls || 0) ? 'bg-green-500' : 'bg-gray-600'
                           }`}
                         />
@@ -719,7 +736,7 @@
                       {[0, 1, 2].map(i => (
                         <div
                           key={i}
-                          className={`w-2 h-2 rounded-full transition-all ${
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${
                             i < (strikes || 0) ? 'bg-yellow-500' : 'bg-gray-600'
                           }`}
                         />
@@ -730,13 +747,13 @@
               )}
 
               {/* Outs */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="text-gray-500 text-xs">O</span>
-                <div className="flex gap-0.5">
+                <div className="flex gap-1">
                   {[0, 1, 2].map(i => (
                     <div
                       key={i}
-                      className={`w-2 h-2 rounded-full transition-all ${
+                      className={`w-2.5 h-2.5 rounded-full transition-all ${
                         i < (outs || 0) ? 'bg-red-500' : 'bg-gray-600'
                       }`}
                     />
@@ -1787,18 +1804,8 @@
               )}
 
               {/* Controls */}
-              <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-3 sm:p-6 border border-gray-800">
-                <div className="mb-3 sm:mb-6">
-                  <div className="text-gray-400 text-xs sm:text-sm mb-2 sm:mb-3 text-center font-medium">⏱ PLAYBACK SPEED</div>
-                  <div className="flex justify-center gap-1 sm:gap-2 flex-wrap">
-                    <SpeedButton speed={4000} currentSpeed={speed} onClick={setSpeed} label="🐢 Slow" />
-                    <SpeedButton speed={2000} currentSpeed={speed} onClick={setSpeed} label="Normal" />
-                    <SpeedButton speed={800} currentSpeed={speed} onClick={setSpeed} label="🐇 Fast" />
-                    <SpeedButton speed={200} currentSpeed={speed} onClick={setSpeed} label="⚡ Rapid" />
-                  </div>
-                </div>
-
-                <div className="flex justify-center gap-2 sm:gap-3">
+              <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-800">
+                <div className="flex justify-center items-center gap-2 sm:gap-3">
                   <button onClick={handleReset} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-lg sm:rounded-xl transition-all" title="Reset">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   </button>
@@ -1818,8 +1825,37 @@
                   <button onClick={() => { setIsPlaying(false); setCurrentStep(maxSteps); }} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-lg sm:rounded-xl transition-all" title="Skip to end">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
                   </button>
-                </div>
 
+                  {/* Speed popover */}
+                  {(() => {
+                    const speedLabels = { 4000: '0.5x', 2000: '1x', 800: '2x', 200: '5x' };
+                    return (
+                      <div className="relative group ml-1">
+                        <button className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-lg sm:rounded-xl transition-all flex items-center gap-1" title="Playback Speed">
+                          <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                          <span className="text-xs sm:text-sm font-medium text-amber-400">{speedLabels[speed] || '1x'}</span>
+                        </button>
+                        <div className="absolute bottom-full right-0 mb-2 hidden group-hover:flex flex-col bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-2 gap-1 min-w-[120px] z-50">
+                          <div className="text-gray-500 text-xs text-center mb-1 font-medium">Speed</div>
+                          {[
+                            { speed: 4000, label: '0.5x Slow' },
+                            { speed: 2000, label: '1x Normal' },
+                            { speed: 800, label: '2x Fast' },
+                            { speed: 200, label: '5x Rapid' }
+                          ].map(opt => (
+                            <button
+                              key={opt.speed}
+                              onClick={() => setSpeed(opt.speed)}
+                              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-left ${speed === opt.speed ? 'bg-amber-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
               <div className="text-center mt-3 sm:mt-6 text-gray-600 text-xs sm:text-sm">
