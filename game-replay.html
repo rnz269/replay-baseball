@@ -1111,9 +1111,11 @@
           if (currentStep >= maxSteps) setIsPlaying(false);
           return;
         }
+        // Pause auto-play during half-inning transition overlay
+        if (inningTransition) return;
         const timer = setTimeout(() => setCurrentStep(prev => prev + 1), speed);
         return () => clearTimeout(timer);
-      }, [isPlaying, currentStep, speed, maxSteps]);
+      }, [isPlaying, currentStep, speed, maxSteps, inningTransition]);
 
       const handleSelectGame = async (game) => {
         setView('loading');
