@@ -902,7 +902,7 @@
       </div>
     );
 
-    const PlayCard = ({ play, homeTeam, awayTeam, isNew, showNonScoring, highlight, isExpanded, onToggleHighlight }) => {
+    const PlayCard = ({ play, homeTeam, awayTeam, isNew, showNonScoring, highlight }) => {
       const team = play.isTop ? awayTeam : homeTeam;
       const halfLabel = play.isTop ? "▲" : "▼";
 
@@ -919,16 +919,6 @@
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">{halfLabel} {play.inning}{getOrdinalSuffix(play.inning)}</span>
                 {play.isScoring && <span className="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded">SCORING</span>}
-                {highlight && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onToggleHighlight && onToggleHighlight(); }}
-                    className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
-                      isExpanded
-                        ? 'bg-amber-600/50 text-amber-300 border border-amber-500/50'
-                        : 'bg-gray-700/50 text-gray-400 hover:text-amber-400 hover:bg-gray-700 border border-gray-600/50'
-                    }`}
-                  >📹 Watch</button>
-                )}
               </div>
               <p className={`mt-1 ${play.isScoring ? 'text-white font-medium' : 'text-gray-400'}`}>
                 {play.isMidAtBatAction ? (
@@ -945,25 +935,18 @@
               </div>
             </div>
           </div>
-          {isExpanded && highlight && (
-            <VideoPlayer highlight={highlight} onClose={() => onToggleHighlight && onToggleHighlight()} />
+          {highlight && (
+            <VideoPlayer highlight={highlight} />
           )}
         </div>
       );
     };
 
-    const VideoPlayer = ({ highlight, onClose }) => {
+    const VideoPlayer = ({ highlight }) => {
       return (
         <div className="video-expand mt-2 rounded-lg overflow-hidden bg-black/50 border border-gray-700">
-          <div className="flex items-center justify-between px-3 py-2 bg-gray-800/80">
-            <div className="flex-1 min-w-0">
-              <span className="text-sm text-gray-200 truncate block">{highlight.headline}</span>
-              {highlight.duration && <span className="text-xs text-gray-500">{highlight.duration}</span>}
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); onClose(); }}
-              className="ml-2 text-gray-400 hover:text-white text-lg leading-none flex-shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 transition-colors"
-            >✕</button>
+          <div className="px-3 py-2 bg-gray-800/80">
+            <span className="text-sm text-gray-200 truncate block">{highlight.headline}</span>
           </div>
           <video
             src={highlight.videoUrl}
@@ -1099,9 +1082,10 @@
       const [celebrating, setCelebrating] = useState(false);
       const [scoringTeam, setScoringTeam] = useState(null);
       const [inningTransition, setInningTransition] = useState(null);
-      const [expandedHighlight, setExpandedHighlight] = useState(null);
       const prevStepRef = useRef(0);
       const prevHalfInningRef = useRef(null);
+      const highlightPauseStepRef = useRef(null);
+      const inningTransitionTimerRef = useRef(null);
       // Deep-link: auto-load game from URL gamePk param
       useEffect(() => {
         if (!initialGamePk) return;
@@ -1250,9 +1234,8 @@
           const half = currentHalfInning.isTop ? 'Top' : 'Bottom';
           const ord = currentHalfInning.inning + (currentHalfInning.inning === 1 ? 'st' : currentHalfInning.inning === 2 ? 'nd' : currentHalfInning.inning === 3 ? 'rd' : 'th');
           setInningTransition(`${currentHalfInning.isTop ? '▲' : '▼'} ${half} ${ord}`);
-          const t = setTimeout(() => setInningTransition(null), 1500);
-          prevHalfInningRef.current = key;
-          return () => clearTimeout(t);
+          clearTimeout(inningTransitionTimerRef.current);
+          inningTransitionTimerRef.current = setTimeout(() => setInningTransition(null), 1500);
         }
         prevHalfInningRef.current = key;
       }, [currentStep, currentHalfInning, mode, gameData]);
@@ -1267,6 +1250,27 @@
         const timer = setTimeout(() => setCurrentStep(prev => prev + 1), speed);
         return () => clearTimeout(timer);
       }, [isPlaying, currentStep, speed, maxSteps, inningTransition]);
+
+      // Auto-pause when a highlight video appears
+      useEffect(() => {
+        if (!isPlaying || !gameData?.highlightMap?.size) return;
+        // Don't re-pause on a step we already paused for
+        if (highlightPauseStepRef.current === currentStep) return;
+        if (mode === 'play') {
+          const plays = getFilteredPlays();
+          const currentPlay = plays[currentStep - 1];
+          if (currentPlay?.atBatIndex != null && gameData.highlightMap.get(currentPlay.atBatIndex)) {
+            highlightPauseStepRef.current = currentStep;
+            setIsPlaying(false);
+          }
+        } else if (mode === 'pitch') {
+          const currentPitch = gameData.pitches?.[currentStep - 1];
+          if (currentPitch?.isFinal && currentPitch?.atBatIndex != null && gameData.highlightMap.get(currentPitch.atBatIndex)) {
+            highlightPauseStepRef.current = currentStep;
+            setIsPlaying(false);
+          }
+        }
+      }, [currentStep, isPlaying, mode, gameData]);
 
       const handleSelectGame = async (game) => {
         setView('loading');
@@ -1301,7 +1305,7 @@
         setGameData(null);
         setCurrentStep(0);
         setIsPlaying(false);
-        setExpandedHighlight(null);
+        highlightPauseStepRef.current = null;
       };
 
       const handlePlayPause = () => {
@@ -1312,14 +1316,15 @@
       const handleReset = () => {
         setIsPlaying(false);
         setCurrentStep(0);
-        setExpandedHighlight(null);
+        highlightPauseStepRef.current = null;
       };
 
       const handleModeChange = (newMode) => {
         if (newMode === mode) return;
 
         setIsPlaying(false);
-        setExpandedHighlight(null);
+        highlightPauseStepRef.current = null;
+
         if (currentGamePk) updateUrl({ gamePk: currentGamePk, mode: newMode });
 
         // Map current position to the new mode
@@ -1820,7 +1825,7 @@
                       {scoringPlaysOnly ? '✓ Scoring Only' : 'Show All'}
                     </button>
                   </div>
-                  <div className={`${expandedHighlight !== null ? 'max-h-96 sm:max-h-[500px]' : 'max-h-24 sm:max-h-40'} overflow-y-auto transition-all duration-300`}>
+                  <div className="max-h-96 sm:max-h-[500px] overflow-y-auto transition-all duration-300">
                     {filteredPlays.slice(0, currentStep).reverse().map((play, i) => {
                       const hl = play.atBatIndex != null ? gameData.highlightMap?.get(play.atBatIndex) : null;
                       return (
@@ -1831,15 +1836,6 @@
                           awayTeam={gameData.awayTeam}
                           isNew={i === 0 && isPlaying}
                           highlight={hl}
-                          isExpanded={expandedHighlight === play.atBatIndex}
-                          onToggleHighlight={() => {
-                            if (expandedHighlight === play.atBatIndex) {
-                              setExpandedHighlight(null);
-                            } else {
-                              setExpandedHighlight(play.atBatIndex);
-                              setIsPlaying(false);
-                            }
-                          }}
                         />
                       );
                     })}
@@ -1939,35 +1935,11 @@
                           {currentPitch.isFinal && currentPitch.finalResult && (
                             <div className={`mt-3 pt-3 border-t ${isOut ? 'border-purple-700/50' : isRunScoring ? 'border-blue-700/50' : 'border-amber-700/50'} text-center`}>
                               <span className={`${finalTextColor} font-bold text-lg`}>⚾ {currentPitch.finalResult}</span>
-                              {(() => {
-                                const pitchHL = currentPitch.atBatIndex != null ? gameData.highlightMap?.get(currentPitch.atBatIndex) : null;
-                                if (!pitchHL) return null;
-                                return (
-                                  <div className="mt-2">
-                                    <button
-                                      onClick={() => {
-                                        if (expandedHighlight === currentPitch.atBatIndex) {
-                                          setExpandedHighlight(null);
-                                        } else {
-                                          setExpandedHighlight(currentPitch.atBatIndex);
-                                          setIsPlaying(false);
-                                        }
-                                      }}
-                                      className={`text-sm px-4 py-1.5 rounded-full transition-all ${
-                                        expandedHighlight === currentPitch.atBatIndex
-                                          ? 'bg-amber-600 text-white'
-                                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-amber-400'
-                                      }`}
-                                    >📹 Watch Highlight</button>
-                                  </div>
-                                );
-                              })()}
                             </div>
                           )}
-                          {currentPitch.isFinal && expandedHighlight === currentPitch.atBatIndex && gameData.highlightMap?.get(currentPitch.atBatIndex) && (
+                          {currentPitch.isFinal && currentPitch.atBatIndex != null && gameData.highlightMap?.get(currentPitch.atBatIndex) && (
                             <VideoPlayer
                               highlight={gameData.highlightMap.get(currentPitch.atBatIndex)}
-                              onClose={() => setExpandedHighlight(null)}
                             />
                           )}
                         </div>
