@@ -93,17 +93,6 @@
       0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
       50% { opacity: 1; transform: scale(1) rotate(180deg); }
     }
-
-    @keyframes pitch-appear {
-      0% { transform: scale(0); opacity: 0; }
-      60% { transform: scale(1.4); opacity: 1; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-
-    @keyframes pitch-pulse {
-      0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
-      50% { filter: drop-shadow(0 0 8px currentColor); }
-    }
   </style>
 </head>
 <body class="bg-gray-950">
@@ -491,16 +480,6 @@
                   const result = event.details?.description || 'Unknown';
                   const balls = event.count?.balls ?? 0;
                   const strikes = event.count?.strikes ?? 0;
-                  // Pitch location & tracking data for strike zone visualization
-                  const pX = event.pitchData?.coordinates?.pX ?? null;
-                  const pZ = event.pitchData?.coordinates?.pZ ?? null;
-                  const szTop = event.pitchData?.strikeZoneTop ?? null;
-                  const szBottom = event.pitchData?.strikeZoneBottom ?? null;
-                  const pitchCode = event.details?.type?.code || null;
-                  const callCode = event.details?.call?.code || null;
-                  const isInPlay = event.details?.isInPlay || false;
-                  const isStrike = event.details?.isStrike || false;
-                  const isBall = event.details?.isBall || false;
 
                   // Use pre-play base state and pre-at-bat SCORE (no spoilers!)
                   pitches.push({
@@ -519,8 +498,7 @@
                     bases: { ...basesBeforePlay },
                     awayScore: scoreBeforeAtBat.away,
                     homeScore: scoreBeforeAtBat.home,
-                    isFinal: false,
-                    pX, pZ, szTop, szBottom, pitchCode, callCode, isInPlay, isStrike, isBall
+                    isFinal: false
                   });
                 }
               });
@@ -739,135 +717,6 @@
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      );
-    };
-
-    // Strike Zone Visualization Component
-    const StrikeZone = ({ currentPitch, allAtBatPitches, revealedCount }) => {
-      // Coordinate mapping: 60px per foot
-      const SCALE = 60;
-      const CENTER_X = 150;
-      const GROUND_Y = 330;
-      const mapX = (pX) => CENTER_X + (pX * SCALE);
-      const mapY = (pZ) => GROUND_Y - (pZ * SCALE);
-
-      // Strike zone dimensions (per-batter or defaults)
-      const plateWidthFeet = 17 / 12; // 1.417 feet
-      const szTop = currentPitch?.szTop ?? 3.5;
-      const szBottom = currentPitch?.szBottom ?? 1.5;
-
-      const zoneLeft = mapX(-plateWidthFeet / 2);
-      const zoneRight = mapX(plateWidthFeet / 2);
-      const zoneWidth = zoneRight - zoneLeft;
-      const zoneTopY = mapY(szTop);
-      const zoneBottomY = mapY(szBottom);
-      const zoneHeight = zoneBottomY - zoneTopY;
-
-      // 3x3 grid lines
-      const gridX1 = zoneLeft + zoneWidth / 3;
-      const gridX2 = zoneLeft + (2 * zoneWidth) / 3;
-      const gridY1 = zoneTopY + zoneHeight / 3;
-      const gridY2 = zoneTopY + (2 * zoneHeight) / 3;
-
-      // Home plate pentagon
-      const plateMargin = 4;
-      const plateTopY = zoneBottomY + plateMargin;
-      const plateH = zoneWidth * 0.3;
-      const plateMidX = (zoneLeft + zoneRight) / 2;
-      const platePath = `M ${zoneLeft} ${plateTopY} L ${zoneRight} ${plateTopY} L ${zoneRight} ${plateTopY + plateH * 0.5} L ${plateMidX} ${plateTopY + plateH} L ${zoneLeft} ${plateTopY + plateH * 0.5} Z`;
-
-      // Pitch color based on result (matches app's existing color scheme)
-      const getPitchColor = (p) => {
-        if (p.isFinal && p.finalResult) {
-          const outKeywords = ['Strikeout', 'Groundout', 'Flyout', 'Lineout', 'Pop Out', 'Forceout', 'Double Play', 'Triple Play', 'Fielders Choice Out', 'Grounded Into', 'Sac Fly', 'Sac Bunt', 'Sacrifice'];
-          const isOut = outKeywords.some(kw => p.finalResult.includes(kw));
-          return isOut ? '#a855f7' : '#3b82f6'; // purple for outs, blue for hits
-        }
-        if (p.isInPlay) return '#3b82f6';
-        if (p.isBall) return '#22c55e';
-        if (p.isStrike) return '#ef4444';
-        // Fallback to string matching
-        if (p.result?.includes('Strike') || p.result?.includes('Foul')) return '#ef4444';
-        if (p.result?.includes('Ball')) return '#22c55e';
-        return '#f59e0b';
-      };
-
-      const visiblePitches = allAtBatPitches.slice(0, revealedCount);
-      const hasPitchLocations = visiblePitches.some(p => p.pX != null && p.pZ != null);
-
-      return (
-        <div className="flex justify-center">
-          <div style={{ width: '100%', maxWidth: '240px' }}>
-            <svg viewBox="0 0 300 360" width="100%" style={{ display: 'block' }}>
-              {/* Strike zone rectangle */}
-              <rect x={zoneLeft} y={zoneTopY} width={zoneWidth} height={zoneHeight}
-                fill="rgba(255,255,255,0.03)" stroke="#6b7280" strokeWidth="2" rx="2" />
-
-              {/* 3x3 grid overlay */}
-              <line x1={gridX1} y1={zoneTopY} x2={gridX1} y2={zoneBottomY} stroke="#374151" strokeWidth="0.5" strokeDasharray="4 4" />
-              <line x1={gridX2} y1={zoneTopY} x2={gridX2} y2={zoneBottomY} stroke="#374151" strokeWidth="0.5" strokeDasharray="4 4" />
-              <line x1={zoneLeft} y1={gridY1} x2={zoneRight} y2={gridY1} stroke="#374151" strokeWidth="0.5" strokeDasharray="4 4" />
-              <line x1={zoneLeft} y1={gridY2} x2={zoneRight} y2={gridY2} stroke="#374151" strokeWidth="0.5" strokeDasharray="4 4" />
-
-              {/* Home plate */}
-              <path d={platePath} fill="#374151" stroke="#6b7280" strokeWidth="1" />
-
-              {/* Pitch dots */}
-              {visiblePitches.map((p, i) => {
-                if (p.pX == null || p.pZ == null) return null;
-                const cx = mapX(p.pX);
-                const cy = mapY(p.pZ);
-                const isCurrent = i === revealedCount - 1;
-                const color = getPitchColor(p);
-                return (
-                  <React.Fragment key={i}>
-                    <circle cx={cx} cy={cy}
-                      r={isCurrent ? 9 : 5}
-                      fill={color}
-                      opacity={isCurrent ? 1 : 0.45}
-                      stroke={isCurrent ? 'white' : 'none'}
-                      strokeWidth={isCurrent ? 2 : 0}
-                      style={isCurrent ? {
-                        transformOrigin: `${cx}px ${cy}px`,
-                        animation: 'pitch-appear 0.4s ease-out forwards, pitch-pulse 2s ease-in-out 0.4s infinite',
-                        color: color
-                      } : {}}
-                    />
-                    {isCurrent && p.pitchCode && (
-                      <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle"
-                        fill="white" fontSize="7" fontWeight="bold" fontFamily="monospace"
-                        style={{ pointerEvents: 'none' }}>
-                        {p.pitchCode}
-                      </text>
-                    )}
-                    {!isCurrent && (
-                      <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle"
-                        fill="rgba(255,255,255,0.6)" fontSize="6" fontWeight="bold" fontFamily="monospace"
-                        style={{ pointerEvents: 'none' }}>
-                        {i + 1}
-                      </text>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-
-              {/* No location data fallback */}
-              {revealedCount > 0 && !hasPitchLocations && (
-                <text x="150" y={zoneTopY + zoneHeight / 2} textAnchor="middle" fill="#6b7280" fontSize="11">
-                  No pitch location data
-                </text>
-              )}
-
-              {/* Speed/type label below plate */}
-              {revealedCount > 0 && currentPitch?.type && (
-                <text x="150" y={plateTopY + plateH + 18} textAnchor="middle"
-                  fill="#9ca3af" fontSize="12" fontFamily="sans-serif">
-                  {currentPitch.type}{currentPitch.speed ? ` \u2022 ${currentPitch.speed} mph` : ''}
-                </text>
-              )}
-            </svg>
           </div>
         </div>
       );
@@ -1262,11 +1111,9 @@
           if (currentStep >= maxSteps) setIsPlaying(false);
           return;
         }
-        // Pause auto-play during half-inning transition overlay
-        if (inningTransition) return;
         const timer = setTimeout(() => setCurrentStep(prev => prev + 1), speed);
         return () => clearTimeout(timer);
-      }, [isPlaying, currentStep, speed, maxSteps, inningTransition]);
+      }, [isPlaying, currentStep, speed, maxSteps]);
 
       const handleSelectGame = async (game) => {
         setView('loading');
@@ -1895,15 +1742,6 @@
                           </div>
                         </div>
 
-                        {/* Strike Zone Visualization */}
-                        <div className="mb-2 sm:mb-4">
-                          <StrikeZone
-                            currentPitch={currentPitch}
-                            allAtBatPitches={gameData.pitches.filter(p => p.playIndex === currentPitch.playIndex)}
-                            revealedCount={currentPitch.pitchNum}
-                          />
-                        </div>
-
                         {/* Pitch Info */}
                         {(() => {
                           // Determine accent color for final result
@@ -1991,15 +1829,7 @@
                       scoringTeam={null}
                     />
                   </div>
-                  {/* Empty Strike Zone placeholder */}
-                  <div className="mb-2 sm:mb-4">
-                    <StrikeZone
-                      currentPitch={{ pX: null, pZ: null, szTop: 3.5, szBottom: 1.5 }}
-                      allAtBatPitches={[]}
-                      revealedCount={0}
-                    />
-                  </div>
-                  <div className="text-center py-1 sm:py-2">
+                  <div className="text-center py-2 sm:py-4">
                     <p className="text-gray-400 text-sm">Press play to see dramatic moments unfold</p>
                   </div>
                 </div>
