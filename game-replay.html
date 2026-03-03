@@ -93,6 +93,14 @@
       0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
       50% { opacity: 1; transform: scale(1) rotate(180deg); }
     }
+    @keyframes expandVideo {
+      from { max-height: 0; opacity: 0; }
+      to { max-height: 400px; opacity: 1; }
+    }
+    .video-expand {
+      animation: expandVideo 0.3s ease-out forwards;
+      overflow: hidden;
+    }
   </style>
 </head>
 <body class="bg-gray-950">
@@ -258,20 +266,114 @@
 
     const fetchGameDetails = async (gamePk) => {
       try {
-        const [linescoreRes, playsRes] = await Promise.all([
+        const [linescoreRes, playsRes, contentRes] = await Promise.all([
           fetch(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`),
-          fetch(`https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`)
+          fetch(`https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`),
+          fetch(`https://statsapi.mlb.com/api/v1/game/${gamePk}/content`).catch(() => null)
         ]);
         const linescoreData = await linescoreRes.json();
         const playsData = await playsRes.json();
-        return { linescore: linescoreData, plays: playsData };
+        const contentData = contentRes ? await contentRes.json().catch(() => null) : null;
+        return { linescore: linescoreData, plays: playsData, content: contentData };
       } catch (error) {
         console.error('Error fetching game details:', error);
         return null;
       }
     };
 
-    const parseGameData = (gameData, playsData) => {
+    // --- Highlight matching utilities ---
+    const matchesEventType = (eventType, taxonomies, headline) => {
+      if (!eventType) return false;
+      const et = eventType.toLowerCase().replace(/_/g, '-');
+      // Check taxonomy tags first
+      if (taxonomies && taxonomies.some(t => {
+        const tv = (t.value || '').toLowerCase();
+        return tv === et || tv.replace(/_/g, '-') === et;
+      })) return true;
+      // Fallback: check headline text with event type aliases
+      const hl = (headline || '').toLowerCase();
+      const etWords = et.replace(/-/g, ' ');
+      if (hl.includes(etWords)) return true;
+      // Common API eventType → headline text aliases
+      const aliases = {
+        'home-run': ['homer', 'home run', 'grand slam'],
+        'double': ['double', 'two-base hit'],
+        'triple': ['triple', 'three-base hit'],
+        'single': ['single'],
+        'field-out': ['grounds out', 'flies out', 'lines out', 'pops out', 'flyout', 'groundout', 'lineout', 'pop out', 'catch'],
+        'strikeout': ['strikes out', 'strikeout', 'punch out', 'k\'s'],
+        'walk': ['walk', 'base on balls'],
+        'sac-fly': ['sacrifice fly', 'sac fly'],
+        'sac-bunt': ['sacrifice bunt', 'sac bunt'],
+        'fielders-choice': ['fielder\'s choice', 'fielders choice'],
+        'hit-by-pitch': ['hit by pitch', 'hit-by-pitch'],
+        'force-out': ['force out', 'forceout'],
+        'grounded-into-double-play': ['double play', 'gidp'],
+        'wild-pitch': ['wild pitch']
+      };
+      const eventAliases = aliases[et] || [];
+      return eventAliases.some(alias => hl.includes(alias));
+    };
+
+    const buildHighlightMap = (highlightItems, allPlays) => {
+      const map = new Map();
+      if (!highlightItems || !allPlays) return map;
+
+      // Filter to only in-game highlight clips (skip recaps, condensed games, etc.)
+      const clips = highlightItems.filter(item => {
+        const taxonomies = item.keywordsAll || [];
+        return taxonomies.some(k => (k.value || '').toLowerCase() === 'in-game-highlight');
+      });
+
+      // For each clip, try to match to a play
+      clips.forEach(clip => {
+        const keywords = clip.keywordsAll || [];
+        const playerIds = keywords
+          .filter(k => k.type === 'player_id')
+          .map(k => parseInt(k.value, 10))
+          .filter(id => !isNaN(id));
+        const taxonomies = keywords.filter(k => k.type === 'taxonomy');
+        const headline = clip.headline || '';
+
+        // Get best mp4 URL from playbacks
+        let videoUrl = null;
+        if (clip.playbacks) {
+          const mp4 = clip.playbacks.find(p => p.name === 'mp4Avc') ||
+                       clip.playbacks.find(p => p.name === 'mp4') ||
+                       clip.playbacks.find(p => (p.url || '').endsWith('.mp4'));
+          if (mp4) videoUrl = mp4.url;
+        }
+        if (!videoUrl) return;
+
+        // Get thumbnail — prefer mid-res cut
+        let thumbnail = '';
+        if (clip.image?.cuts) {
+          const cuts = clip.image.cuts;
+          thumbnail = (cuts['640x360'] || cuts['480x270'] || cuts['320x180'] || cuts['960x540'] || Object.values(cuts)[0])?.src || '';
+        }
+
+        // Try matching to a play via player_id + event type
+        for (const play of allPlays) {
+          if (map.has(play.about.atBatIndex)) continue; // already matched
+          const batterId = play.matchup?.batter?.id;
+          if (!batterId || !playerIds.includes(batterId)) continue;
+          const resultEventType = play.result?.eventType || '';
+          if (matchesEventType(resultEventType, taxonomies, headline)) {
+            map.set(play.about.atBatIndex, {
+              videoUrl,
+              thumbnail,
+              headline: clip.headline || clip.title || '',
+              duration: clip.duration || ''
+            });
+            break; // first chronological match wins
+          }
+        }
+      });
+
+      return map;
+    };
+
+    const parseGameData = (gameData, playsData, contentData) => {
       const game = gameData.gameData;
       const linescore = gameData.liveData?.linescore;
       if (!game || !linescore) return null;
@@ -498,7 +600,8 @@
                     bases: { ...basesBeforePlay },
                     awayScore: scoreBeforeAtBat.away,
                     homeScore: scoreBeforeAtBat.home,
-                    isFinal: false
+                    isFinal: false,
+                    atBatIndex: play.about.atBatIndex
                   });
                 }
               });
@@ -541,7 +644,8 @@
               awayScore: currentAwayScore,
               homeScore: currentHomeScore,
               outs: outs,
-              bases: bases
+              bases: bases,
+              atBatIndex: play.about.atBatIndex
             });
 
             playIndex++;
@@ -582,6 +686,12 @@
         });
       }
 
+      // Build highlight map from content data
+      const highlightMap = buildHighlightMap(
+        contentData?.highlights?.highlights?.items,
+        playsData?.allPlays
+      );
+
       return {
         homeTeam: homeTeamInfo,
         awayTeam: awayTeamInfo,
@@ -589,7 +699,8 @@
         venue: game.venue?.name || 'Unknown Venue',
         halfInnings,
         plays,
-        pitches
+        pitches,
+        highlightMap
       };
     };
 
@@ -791,7 +902,7 @@
       </div>
     );
 
-    const PlayCard = ({ play, homeTeam, awayTeam, isNew, showNonScoring }) => {
+    const PlayCard = ({ play, homeTeam, awayTeam, isNew, showNonScoring, highlight, isExpanded, onToggleHighlight }) => {
       const team = play.isTop ? awayTeam : homeTeam;
       const halfLabel = play.isTop ? "▲" : "▼";
 
@@ -808,6 +919,16 @@
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">{halfLabel} {play.inning}{getOrdinalSuffix(play.inning)}</span>
                 {play.isScoring && <span className="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded">SCORING</span>}
+                {highlight && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onToggleHighlight && onToggleHighlight(); }}
+                    className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
+                      isExpanded
+                        ? 'bg-amber-600/50 text-amber-300 border border-amber-500/50'
+                        : 'bg-gray-700/50 text-gray-400 hover:text-amber-400 hover:bg-gray-700 border border-gray-600/50'
+                    }`}
+                  >📹 Watch</button>
+                )}
               </div>
               <p className={`mt-1 ${play.isScoring ? 'text-white font-medium' : 'text-gray-400'}`}>
                 {play.isMidAtBatAction ? (
@@ -824,6 +945,35 @@
               </div>
             </div>
           </div>
+          {isExpanded && highlight && (
+            <VideoPlayer highlight={highlight} onClose={() => onToggleHighlight && onToggleHighlight()} />
+          )}
+        </div>
+      );
+    };
+
+    const VideoPlayer = ({ highlight, onClose }) => {
+      return (
+        <div className="video-expand mt-2 rounded-lg overflow-hidden bg-black/50 border border-gray-700">
+          <div className="flex items-center justify-between px-3 py-2 bg-gray-800/80">
+            <div className="flex-1 min-w-0">
+              <span className="text-sm text-gray-200 truncate block">{highlight.headline}</span>
+              {highlight.duration && <span className="text-xs text-gray-500">{highlight.duration}</span>}
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
+              className="ml-2 text-gray-400 hover:text-white text-lg leading-none flex-shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 transition-colors"
+            >✕</button>
+          </div>
+          <video
+            src={highlight.videoUrl}
+            poster={highlight.thumbnail}
+            preload="none"
+            playsInline
+            controls
+            className="w-full"
+            style={{ maxHeight: '300px', aspectRatio: '16/9' }}
+          />
         </div>
       );
     };
@@ -949,6 +1099,7 @@
       const [celebrating, setCelebrating] = useState(false);
       const [scoringTeam, setScoringTeam] = useState(null);
       const [inningTransition, setInningTransition] = useState(null);
+      const [expandedHighlight, setExpandedHighlight] = useState(null);
       const prevStepRef = useRef(0);
       const prevHalfInningRef = useRef(null);
       // Deep-link: auto-load game from URL gamePk param
@@ -958,7 +1109,7 @@
           setLoadingMessage('Loading game data...');
           const details = await fetchGameDetails(initialGamePk);
           if (details) {
-            const parsed = parseGameData(details.linescore, details.plays);
+            const parsed = parseGameData(details.linescore, details.plays, details.content);
             if (parsed && parsed.halfInnings.length > 0) {
               setGameData(parsed);
               setView('warning');
@@ -1124,7 +1275,7 @@
         updateUrl({ gamePk: game.gamePk, mode: null });
         const details = await fetchGameDetails(game.gamePk);
         if (details) {
-          const parsed = parseGameData(details.linescore, details.plays);
+          const parsed = parseGameData(details.linescore, details.plays, details.content);
           if (parsed && parsed.halfInnings.length > 0) {
             setGameData(parsed);
             setView('warning');
@@ -1150,6 +1301,7 @@
         setGameData(null);
         setCurrentStep(0);
         setIsPlaying(false);
+        setExpandedHighlight(null);
       };
 
       const handlePlayPause = () => {
@@ -1160,12 +1312,14 @@
       const handleReset = () => {
         setIsPlaying(false);
         setCurrentStep(0);
+        setExpandedHighlight(null);
       };
 
       const handleModeChange = (newMode) => {
         if (newMode === mode) return;
 
         setIsPlaying(false);
+        setExpandedHighlight(null);
         if (currentGamePk) updateUrl({ gamePk: currentGamePk, mode: newMode });
 
         // Map current position to the new mode
@@ -1666,16 +1820,29 @@
                       {scoringPlaysOnly ? '✓ Scoring Only' : 'Show All'}
                     </button>
                   </div>
-                  <div className="max-h-24 sm:max-h-40 overflow-y-auto">
-                    {filteredPlays.slice(0, currentStep).reverse().map((play, i) => (
-                      <PlayCard
-                        key={i}
-                        play={play}
-                        homeTeam={gameData.homeTeam}
-                        awayTeam={gameData.awayTeam}
-                        isNew={i === 0 && isPlaying}
-                      />
-                    ))}
+                  <div className={`${expandedHighlight !== null ? 'max-h-96 sm:max-h-[500px]' : 'max-h-24 sm:max-h-40'} overflow-y-auto transition-all duration-300`}>
+                    {filteredPlays.slice(0, currentStep).reverse().map((play, i) => {
+                      const hl = play.atBatIndex != null ? gameData.highlightMap?.get(play.atBatIndex) : null;
+                      return (
+                        <PlayCard
+                          key={i}
+                          play={play}
+                          homeTeam={gameData.homeTeam}
+                          awayTeam={gameData.awayTeam}
+                          isNew={i === 0 && isPlaying}
+                          highlight={hl}
+                          isExpanded={expandedHighlight === play.atBatIndex}
+                          onToggleHighlight={() => {
+                            if (expandedHighlight === play.atBatIndex) {
+                              setExpandedHighlight(null);
+                            } else {
+                              setExpandedHighlight(play.atBatIndex);
+                              setIsPlaying(false);
+                            }
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1772,7 +1939,36 @@
                           {currentPitch.isFinal && currentPitch.finalResult && (
                             <div className={`mt-3 pt-3 border-t ${isOut ? 'border-purple-700/50' : isRunScoring ? 'border-blue-700/50' : 'border-amber-700/50'} text-center`}>
                               <span className={`${finalTextColor} font-bold text-lg`}>⚾ {currentPitch.finalResult}</span>
+                              {(() => {
+                                const pitchHL = currentPitch.atBatIndex != null ? gameData.highlightMap?.get(currentPitch.atBatIndex) : null;
+                                if (!pitchHL) return null;
+                                return (
+                                  <div className="mt-2">
+                                    <button
+                                      onClick={() => {
+                                        if (expandedHighlight === currentPitch.atBatIndex) {
+                                          setExpandedHighlight(null);
+                                        } else {
+                                          setExpandedHighlight(currentPitch.atBatIndex);
+                                          setIsPlaying(false);
+                                        }
+                                      }}
+                                      className={`text-sm px-4 py-1.5 rounded-full transition-all ${
+                                        expandedHighlight === currentPitch.atBatIndex
+                                          ? 'bg-amber-600 text-white'
+                                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-amber-400'
+                                      }`}
+                                    >📹 Watch Highlight</button>
+                                  </div>
+                                );
+                              })()}
                             </div>
+                          )}
+                          {currentPitch.isFinal && expandedHighlight === currentPitch.atBatIndex && gameData.highlightMap?.get(currentPitch.atBatIndex) && (
+                            <VideoPlayer
+                              highlight={gameData.highlightMap.get(currentPitch.atBatIndex)}
+                              onClose={() => setExpandedHighlight(null)}
+                            />
                           )}
                         </div>
                           );
