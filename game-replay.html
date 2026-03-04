@@ -1288,14 +1288,21 @@
         const crossing = detectHalfInningCrossing(currentStep, currentStep + 1);
         if (crossing) {
           // Show transition BEFORE advancing — step stays put
-          setInningTransition(buildTransitionLabel(crossing));
+          const label = buildTransitionLabel(crossing);
+          setInningTransition(label);
           clearTimeout(inningTransitionTimerRef.current);
           inningTransitionTimerRef.current = setTimeout(() => {
-            setInningTransition(null);
-            // Only advance if still playing (user may have paused during transition)
-            if (isPlayingRef.current) {
-              setCurrentStep(prev => prev + 1);
-            }
+            // CRITICAL: Use unstable_batchedUpdates because ReactDOM.render() (legacy mode)
+            // does NOT auto-batch state updates in setTimeout. Without this, setInningTransition(null)
+            // triggers an immediate re-render where currentStep is still the old value, causing
+            // the auto-play effect to detect the same crossing again → double transition.
+            ReactDOM.unstable_batchedUpdates(() => {
+              setInningTransition(null);
+              // Only advance if still playing (user may have paused during transition)
+              if (isPlayingRef.current) {
+                setCurrentStep(prev => prev + 1);
+              }
+            });
           }, 1500);
           return;
         }
