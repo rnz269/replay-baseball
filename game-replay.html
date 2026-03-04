@@ -1086,6 +1086,7 @@
       const prevHalfInningRef = useRef(null);
       const highlightPauseStepRef = useRef(null);
       const inningTransitionTimerRef = useRef(null);
+      const isPlayingRef = useRef(false);
       // Deep-link: auto-load game from URL gamePk param
       useEffect(() => {
         if (!initialGamePk) return;
@@ -1223,32 +1224,70 @@
 
       const currentHalfInning = getCurrentHalfInning();
 
-      // Detect half-inning transitions and show overlay
+      // Keep isPlayingRef in sync for use inside timeouts
+      useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+      // Helper: get half-inning key for a play/pitch item
+      const getHalfInningKey = (item) => item ? `${item.inning}-${item.isTop}` : null;
+
+      // Helper: build transition label from a play/pitch item
+      const buildTransitionLabel = (item) => {
+        const half = item.isTop ? 'Top' : 'Bottom';
+        const ord = item.inning + (item.inning === 1 ? 'st' : item.inning === 2 ? 'nd' : item.inning === 3 ? 'rd' : 'th');
+        return `${item.isTop ? '▲' : '▼'} ${half} ${ord}`;
+      };
+
+      // Detect half-inning transitions for MANUAL stepping only
       useEffect(() => {
         if (!gameData || currentStep === 0 || mode === 'inning') {
-          prevHalfInningRef.current = currentHalfInning ? `${currentHalfInning.inning}-${currentHalfInning.isTop}` : null;
+          prevHalfInningRef.current = currentHalfInning ? getHalfInningKey(currentHalfInning) : null;
           return;
         }
-        const key = currentHalfInning ? `${currentHalfInning.inning}-${currentHalfInning.isTop}` : null;
-        if (key && prevHalfInningRef.current && key !== prevHalfInningRef.current) {
-          const half = currentHalfInning.isTop ? 'Top' : 'Bottom';
-          const ord = currentHalfInning.inning + (currentHalfInning.inning === 1 ? 'st' : currentHalfInning.inning === 2 ? 'nd' : currentHalfInning.inning === 3 ? 'rd' : 'th');
-          setInningTransition(`${currentHalfInning.isTop ? '▲' : '▼'} ${half} ${ord}`);
+        const key = getHalfInningKey(currentHalfInning);
+        // Only show overlay for manual steps (auto-play handles its own transitions)
+        if (!isPlayingRef.current && key && prevHalfInningRef.current && key !== prevHalfInningRef.current) {
+          setInningTransition(buildTransitionLabel(currentHalfInning));
           clearTimeout(inningTransitionTimerRef.current);
           inningTransitionTimerRef.current = setTimeout(() => setInningTransition(null), 1500);
         }
         prevHalfInningRef.current = key;
       }, [currentStep, currentHalfInning, mode, gameData]);
 
+      // Auto-play timer with peek-ahead for half-inning transitions
       useEffect(() => {
         if (!isPlaying || currentStep >= maxSteps) {
           if (currentStep >= maxSteps) setIsPlaying(false);
           return;
         }
-        // Pause auto-play during half-inning transition overlay
+        // Wait for transition overlay to complete before advancing
         if (inningTransition) return;
-        const timer = setTimeout(() => setCurrentStep(prev => prev + 1), speed);
-        return () => clearTimeout(timer);
+
+        // Peek ahead: will the next step cross a half-inning boundary?
+        let willCross = false;
+        if (currentStep > 0 && mode !== 'inning' && gameData) {
+          const items = mode === 'play' ? getFilteredPlays() : gameData.pitches;
+          const curr = items?.[currentStep - 1];
+          const next = items?.[currentStep];
+          if (curr && next && getHalfInningKey(curr) !== getHalfInningKey(next)) {
+            willCross = true;
+            // Show transition BEFORE advancing — step stays put
+            setInningTransition(buildTransitionLabel(next));
+            prevHalfInningRef.current = getHalfInningKey(next);
+            clearTimeout(inningTransitionTimerRef.current);
+            inningTransitionTimerRef.current = setTimeout(() => {
+              setInningTransition(null);
+              // Only advance if still playing (user may have paused during transition)
+              if (isPlayingRef.current) {
+                setCurrentStep(prev => prev + 1);
+              }
+            }, 1500);
+          }
+        }
+
+        if (!willCross) {
+          const timer = setTimeout(() => setCurrentStep(prev => prev + 1), speed);
+          return () => clearTimeout(timer);
+        }
       }, [isPlaying, currentStep, speed, maxSteps, inningTransition]);
 
       // Auto-pause when a highlight video appears
@@ -1306,6 +1345,8 @@
         setCurrentStep(0);
         setIsPlaying(false);
         highlightPauseStepRef.current = null;
+        setInningTransition(null);
+        clearTimeout(inningTransitionTimerRef.current);
       };
 
       const handlePlayPause = () => {
@@ -1317,6 +1358,8 @@
         setIsPlaying(false);
         setCurrentStep(0);
         highlightPauseStepRef.current = null;
+        setInningTransition(null);
+        clearTimeout(inningTransitionTimerRef.current);
       };
 
       const handleModeChange = (newMode) => {
@@ -1324,6 +1367,8 @@
 
         setIsPlaying(false);
         highlightPauseStepRef.current = null;
+        setInningTransition(null);
+        clearTimeout(inningTransitionTimerRef.current);
 
         if (currentGamePk) updateUrl({ gamePk: currentGamePk, mode: newMode });
 
