@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>⚾ Game Replay - Spoiler-Free Experience</title>
+  <title>ReplayBaseball - Replay Any Game, Spoiler-Free</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%23f59e0b'/><circle cx='32' cy='32' r='22' fill='%23111827'/><path d='M20 26 L32 18 L44 26 M20 38 L32 46 L44 38' stroke='%23f59e0b' stroke-width='3' fill='none' stroke-linecap='round'/><circle cx='32' cy='32' r='3' fill='%23f59e0b'/></svg>" type="image/svg+xml">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -80,6 +81,14 @@
     @keyframes sparkle {
       0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
       50% { opacity: 1; transform: scale(1) rotate(180deg); }
+    }
+    @keyframes expandVideo {
+      from { max-height: 0; opacity: 0; }
+      to { max-height: 400px; opacity: 1; }
+    }
+    .video-expand {
+      animation: expandVideo 0.3s ease-out forwards;
+      overflow: hidden;
     }
   </style>
 </head>
@@ -228,63 +237,7 @@
       158: { name: "Brewers", abbreviation: "MIL", color: "#12284B" }
     };
 
-    // Curated list of exciting real MLB games - high-scoring, comebacks, walk-offs
-    const EXCITING_GAMES = [
-      // 2024 Season highlights
-      { gamePk: 745546, desc: "Rangers vs Astros - High-scoring thriller" },
-      { gamePk: 746273, desc: "Dodgers vs Padres - NL West rivalry" },
-      { gamePk: 745986, desc: "Yankees vs Red Sox - Classic rivalry" },
-      { gamePk: 747165, desc: "Braves vs Phillies - NL East battle" },
-      { gamePk: 746891, desc: "Cubs vs Cardinals - Historic rivalry" },
 
-      // 2023 Season highlights
-      { gamePk: 717465, desc: "Rangers vs Diamondbacks - World Series Game 5" },
-      { gamePk: 716463, desc: "Phillies vs Diamondbacks - NLCS Game 7" },
-      { gamePk: 715752, desc: "Astros vs Rangers - ALCS thriller" },
-      { gamePk: 718782, desc: "Dodgers vs Padres - September showdown" },
-      { gamePk: 716439, desc: "Braves vs Phillies - Playoff drama" },
-
-      // 2022 Exciting games
-      { gamePk: 663341, desc: "Phillies vs Astros - World Series Game 5" },
-      { gamePk: 662614, desc: "Padres vs Phillies - NLCS Game 5" },
-      { gamePk: 661527, desc: "Mariners vs Astros - ALDS thriller" },
-      { gamePk: 662419, desc: "Yankees vs Guardians - ALDS Game 5" },
-      { gamePk: 661578, desc: "Cardinals vs Phillies - Wild Card" },
-
-      // Regular season high-scoring games
-      { gamePk: 718892, desc: "High-scoring slugfest 2023" },
-      { gamePk: 716745, desc: "Comeback victory 2023" },
-      { gamePk: 745873, desc: "Extra innings thriller 2024" },
-      { gamePk: 746112, desc: "Late-inning drama 2024" },
-      { gamePk: 663098, desc: "Walk-off classic 2022" },
-    ];
-
-    // Function to fetch and load a random exciting game
-    const fetchRandomExcitingGame = async () => {
-      // Shuffle and try games until one works
-      const shuffled = [...EXCITING_GAMES].sort(() => Math.random() - 0.5);
-
-      for (const game of shuffled) {
-        try {
-          const [linescoreRes, playsRes] = await Promise.all([
-            fetch(`https://statsapi.mlb.com/api/v1.1/game/${game.gamePk}/feed/live`),
-            fetch(`https://statsapi.mlb.com/api/v1/game/${game.gamePk}/playByPlay`)
-          ]);
-
-          if (!linescoreRes.ok || !playsRes.ok) continue;
-
-          const linescoreData = await linescoreRes.json();
-          const playsData = await playsRes.json();
-
-          // parseGameData is defined below, we'll call it from the component
-          return { linescore: linescoreData, plays: playsData, gamePk: game.gamePk, desc: game.desc };
-        } catch (error) {
-          console.log(`Failed to fetch game ${game.gamePk}, trying next...`);
-          continue;
-        }
-      }
-      return null;
-    };
 
     // API Functions
     const fetchGamesForDate = async (date) => {
@@ -302,20 +255,114 @@
 
     const fetchGameDetails = async (gamePk) => {
       try {
-        const [linescoreRes, playsRes] = await Promise.all([
+        const [linescoreRes, playsRes, contentRes] = await Promise.all([
           fetch(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`),
-          fetch(`https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`)
+          fetch(`https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`),
+          fetch(`https://statsapi.mlb.com/api/v1/game/${gamePk}/content`).catch(() => null)
         ]);
         const linescoreData = await linescoreRes.json();
         const playsData = await playsRes.json();
-        return { linescore: linescoreData, plays: playsData };
+        const contentData = contentRes ? await contentRes.json().catch(() => null) : null;
+        return { linescore: linescoreData, plays: playsData, content: contentData };
       } catch (error) {
         console.error('Error fetching game details:', error);
         return null;
       }
     };
 
-    const parseGameData = (gameData, playsData) => {
+    // --- Highlight matching utilities ---
+    const matchesEventType = (eventType, taxonomies, headline) => {
+      if (!eventType) return false;
+      const et = eventType.toLowerCase().replace(/_/g, '-');
+      // Check taxonomy tags first
+      if (taxonomies && taxonomies.some(t => {
+        const tv = (t.value || '').toLowerCase();
+        return tv === et || tv.replace(/_/g, '-') === et;
+      })) return true;
+      // Fallback: check headline text with event type aliases
+      const hl = (headline || '').toLowerCase();
+      const etWords = et.replace(/-/g, ' ');
+      if (hl.includes(etWords)) return true;
+      // Common API eventType → headline text aliases
+      const aliases = {
+        'home-run': ['homer', 'home run', 'grand slam'],
+        'double': ['double', 'two-base hit'],
+        'triple': ['triple', 'three-base hit'],
+        'single': ['single'],
+        'field-out': ['grounds out', 'flies out', 'lines out', 'pops out', 'flyout', 'groundout', 'lineout', 'pop out', 'catch'],
+        'strikeout': ['strikes out', 'strikeout', 'punch out', 'k\'s'],
+        'walk': ['walk', 'base on balls'],
+        'sac-fly': ['sacrifice fly', 'sac fly'],
+        'sac-bunt': ['sacrifice bunt', 'sac bunt'],
+        'fielders-choice': ['fielder\'s choice', 'fielders choice'],
+        'hit-by-pitch': ['hit by pitch', 'hit-by-pitch'],
+        'force-out': ['force out', 'forceout'],
+        'grounded-into-double-play': ['double play', 'gidp'],
+        'wild-pitch': ['wild pitch']
+      };
+      const eventAliases = aliases[et] || [];
+      return eventAliases.some(alias => hl.includes(alias));
+    };
+
+    const buildHighlightMap = (highlightItems, allPlays) => {
+      const map = new Map();
+      if (!highlightItems || !allPlays) return map;
+
+      // Filter to only in-game highlight clips (skip recaps, condensed games, etc.)
+      const clips = highlightItems.filter(item => {
+        const taxonomies = item.keywordsAll || [];
+        return taxonomies.some(k => (k.value || '').toLowerCase() === 'in-game-highlight');
+      });
+
+      // For each clip, try to match to a play
+      clips.forEach(clip => {
+        const keywords = clip.keywordsAll || [];
+        const playerIds = keywords
+          .filter(k => k.type === 'player_id')
+          .map(k => parseInt(k.value, 10))
+          .filter(id => !isNaN(id));
+        const taxonomies = keywords.filter(k => k.type === 'taxonomy');
+        const headline = clip.headline || '';
+
+        // Get best mp4 URL from playbacks
+        let videoUrl = null;
+        if (clip.playbacks) {
+          const mp4 = clip.playbacks.find(p => p.name === 'mp4Avc') ||
+                       clip.playbacks.find(p => p.name === 'mp4') ||
+                       clip.playbacks.find(p => (p.url || '').endsWith('.mp4'));
+          if (mp4) videoUrl = mp4.url;
+        }
+        if (!videoUrl) return;
+
+        // Get thumbnail — prefer mid-res cut
+        let thumbnail = '';
+        if (clip.image?.cuts) {
+          const cuts = clip.image.cuts;
+          thumbnail = (cuts['640x360'] || cuts['480x270'] || cuts['320x180'] || cuts['960x540'] || Object.values(cuts)[0])?.src || '';
+        }
+
+        // Try matching to a play via player_id + event type
+        for (const play of allPlays) {
+          if (map.has(play.about.atBatIndex)) continue; // already matched
+          const batterId = play.matchup?.batter?.id;
+          if (!batterId || !playerIds.includes(batterId)) continue;
+          const resultEventType = play.result?.eventType || '';
+          if (matchesEventType(resultEventType, taxonomies, headline)) {
+            map.set(play.about.atBatIndex, {
+              videoUrl,
+              thumbnail,
+              headline: clip.headline || clip.title || '',
+              duration: clip.duration || ''
+            });
+            break; // first chronological match wins
+          }
+        }
+      });
+
+      return map;
+    };
+
+    const parseGameData = (gameData, playsData, contentData) => {
       const game = gameData.gameData;
       const linescore = gameData.liveData?.linescore;
       if (!game || !linescore) return null;
@@ -542,7 +589,8 @@
                     bases: { ...basesBeforePlay },
                     awayScore: scoreBeforeAtBat.away,
                     homeScore: scoreBeforeAtBat.home,
-                    isFinal: false
+                    isFinal: false,
+                    atBatIndex: play.about.atBatIndex
                   });
                 }
               });
@@ -559,16 +607,34 @@
               }
             }
 
+            // For runner events (caught stealing, stolen base, etc.), show the runner's name
+            const runnerEventKeywords = ['Caught Stealing', 'Stolen Base', 'Picked Off', 'Pickoff'];
+            const resultEvent = play.result?.event || '';
+            let displayBatter = batter;
+            if (runnerEventKeywords.some(kw => resultEvent.includes(kw)) && play.runners) {
+              for (const runner of play.runners) {
+                const runnerEvt = runner.details?.event || '';
+                if (runnerEventKeywords.some(kw => runnerEvt.includes(kw))) {
+                  const runnerFullName = runner.details?.runner?.fullName;
+                  if (runnerFullName) {
+                    displayBatter = runnerFullName.split(' ').pop();
+                    break;
+                  }
+                }
+              }
+            }
+
             plays.push({
               inning: play.about.inning,
               isTop: isTop,
-              batter: batter,
+              batter: displayBatter,
               event: play.result.event,
               isScoring: isScoring,
               awayScore: currentAwayScore,
               homeScore: currentHomeScore,
               outs: outs,
-              bases: bases
+              bases: bases,
+              atBatIndex: play.about.atBatIndex
             });
 
             playIndex++;
@@ -609,6 +675,12 @@
         });
       }
 
+      // Build highlight map from content data
+      const highlightMap = buildHighlightMap(
+        contentData?.highlights?.highlights?.items,
+        playsData?.allPlays
+      );
+
       return {
         homeTeam: homeTeamInfo,
         awayTeam: awayTeamInfo,
@@ -616,7 +688,8 @@
         venue: game.venue?.name || 'Unknown Venue',
         halfInnings,
         plays,
-        pitches
+        pitches,
+        highlightMap
       };
     };
 
@@ -641,7 +714,7 @@
 
         return (
           <div
-            className={`absolute w-5 h-5 border-2 transition-all duration-300 ${
+            className={`absolute w-6 h-6 border-2 transition-all duration-300 ${
               occupied
                 ? 'bg-amber-400 border-amber-500 shadow-lg shadow-amber-400/50'
                 : 'bg-gray-700 border-gray-600'
@@ -654,37 +727,37 @@
       return (
         <div
           key={animationKey}
-          className={`bg-gray-900/95 rounded-xl border p-3 shadow-xl backdrop-blur-sm transition-all ${
+          className={`bg-gray-900/95 rounded-xl border p-4 sm:p-5 shadow-xl backdrop-blur-sm transition-all ${
             celebrating
               ? 'dance-celebrate border-amber-500 shadow-amber-500/30'
               : 'border-gray-700'
           }`}
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 sm:gap-6">
             {/* Teams and Score */}
-            <div className="flex flex-col gap-1 min-w-[100px]">
-              <div className={`flex items-center justify-between text-sm ${isTop ? 'text-white' : 'text-gray-400'}`}>
-                <div className="flex items-center gap-1">
-                  <TeamLogo teamId={awayTeam.id} abbreviation={awayTeam.abbreviation} color={awayTeam.color} size="xs" />
-                  <span className="font-bold text-xs" style={{ color: awayTeam.color }}>{awayTeam.abbreviation}</span>
+            <div className="flex flex-col gap-1.5 min-w-[130px]">
+              <div className={`flex items-center justify-between ${isTop ? 'text-white' : 'text-gray-400'}`}>
+                <div className="flex items-center gap-1.5">
+                  <TeamLogo teamId={awayTeam.id} abbreviation={awayTeam.abbreviation} color={awayTeam.color} size="sm" />
+                  <span className="font-bold text-sm" style={{ color: awayTeam.color }}>{awayTeam.abbreviation}</span>
                 </div>
-                <span className={`font-mono font-bold ml-3 ${celebrating && scoringTeam === 'away' ? 'score-celebrate' : ''}`}>{awayScore}</span>
+                <span className={`font-mono font-bold text-lg ml-3 ${celebrating && scoringTeam === 'away' ? 'score-celebrate' : ''}`}>{awayScore}</span>
               </div>
-              <div className={`flex items-center justify-between text-sm ${!isTop ? 'text-white' : 'text-gray-400'}`}>
-                <div className="flex items-center gap-1">
-                  <TeamLogo teamId={homeTeam.id} abbreviation={homeTeam.abbreviation} color={homeTeam.color} size="xs" />
-                  <span className="font-bold text-xs" style={{ color: homeTeam.color }}>{homeTeam.abbreviation}</span>
+              <div className={`flex items-center justify-between ${!isTop ? 'text-white' : 'text-gray-400'}`}>
+                <div className="flex items-center gap-1.5">
+                  <TeamLogo teamId={homeTeam.id} abbreviation={homeTeam.abbreviation} color={homeTeam.color} size="sm" />
+                  <span className="font-bold text-sm" style={{ color: homeTeam.color }}>{homeTeam.abbreviation}</span>
                 </div>
-                <span className={`font-mono font-bold ml-3 ${celebrating && scoringTeam === 'home' ? 'score-celebrate' : ''}`}>{homeScore}</span>
+                <span className={`font-mono font-bold text-lg ml-3 ${celebrating && scoringTeam === 'home' ? 'score-celebrate' : ''}`}>{homeScore}</span>
               </div>
             </div>
 
             {/* Diamond */}
-            <div className="relative w-16 h-16">
+            <div className="relative w-20 h-20">
               {/* Diamond outline */}
               <div className="absolute inset-2 border-2 border-gray-600 rotate-45 bg-gray-800/50"></div>
               {/* Home plate */}
-              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-gray-500 rotate-45"></div>
+              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-gray-500 rotate-45"></div>
               {/* Bases */}
               <BaseShape position="first" occupied={bases?.first} />
               <BaseShape position="second" occupied={bases?.second} />
@@ -693,7 +766,7 @@
 
             {/* Inning, Outs, and Count */}
             <div className="flex flex-col items-center gap-1">
-              <div className="text-amber-400 font-bold text-sm">
+              <div className="text-amber-400 font-bold text-lg">
                 {isTop ? '▲' : '▼'} {inning}
               </div>
 
@@ -706,7 +779,7 @@
                       {[0, 1, 2, 3].map(i => (
                         <div
                           key={i}
-                          className={`w-2 h-2 rounded-full transition-all ${
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${
                             i < (balls || 0) ? 'bg-green-500' : 'bg-gray-600'
                           }`}
                         />
@@ -719,7 +792,7 @@
                       {[0, 1, 2].map(i => (
                         <div
                           key={i}
-                          className={`w-2 h-2 rounded-full transition-all ${
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${
                             i < (strikes || 0) ? 'bg-yellow-500' : 'bg-gray-600'
                           }`}
                         />
@@ -730,13 +803,13 @@
               )}
 
               {/* Outs */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="text-gray-500 text-xs">O</span>
-                <div className="flex gap-0.5">
+                <div className="flex gap-1">
                   {[0, 1, 2].map(i => (
                     <div
                       key={i}
-                      className={`w-2 h-2 rounded-full transition-all ${
+                      className={`w-2.5 h-2.5 rounded-full transition-all ${
                         i < (outs || 0) ? 'bg-red-500' : 'bg-gray-600'
                       }`}
                     />
@@ -767,7 +840,7 @@
         }
       }, [value]);
 
-      const sizeClasses = size === "large" ? "w-14 h-20 text-5xl" : size === "medium" ? "w-10 h-14 text-3xl" : "w-7 h-10 text-xl";
+      const sizeClasses = size === "large" ? "w-16 h-24 text-6xl sm:w-20 sm:h-28 sm:text-7xl" : size === "medium" ? "w-12 h-16 text-4xl" : "w-7 h-10 text-xl";
 
       return (
         <div
@@ -824,7 +897,7 @@
       </div>
     );
 
-    const PlayCard = ({ play, homeTeam, awayTeam, isNew, showNonScoring }) => {
+    const PlayCard = ({ play, homeTeam, awayTeam, isNew, showNonScoring, highlight }) => {
       const team = play.isTop ? awayTeam : homeTeam;
       const halfLabel = play.isTop ? "▲" : "▼";
 
@@ -857,6 +930,28 @@
               </div>
             </div>
           </div>
+          {highlight && (
+            <VideoPlayer highlight={highlight} />
+          )}
+        </div>
+      );
+    };
+
+    const VideoPlayer = ({ highlight }) => {
+      return (
+        <div className="video-expand mt-2 rounded-lg overflow-hidden bg-black/50 border border-gray-700">
+          <div className="px-3 py-2 bg-gray-800/80">
+            <span className="text-sm text-gray-200 truncate block">{highlight.headline}</span>
+          </div>
+          <video
+            src={highlight.videoUrl}
+            poster={highlight.thumbnail}
+            preload="none"
+            playsInline
+            controls
+            className="w-full"
+            style={{ maxHeight: '300px', aspectRatio: '16/9' }}
+          />
         </div>
       );
     };
@@ -869,8 +964,8 @@
 
     // Team Logo component - uses MLB static CDN
     const TeamLogo = ({ teamId, abbreviation, color, size = 'md' }) => {
-      const sizeMap = { xs: 'w-5 h-5', sm: 'w-8 h-8', md: 'w-12 h-12', lg: 'w-16 h-16' };
-      const textMap = { xs: 'text-[8px]', sm: 'text-xs', md: 'text-sm', lg: 'text-lg' };
+      const sizeMap = { xs: 'w-5 h-5', sm: 'w-8 h-8', md: 'w-12 h-12', lg: 'w-16 h-16', xl: 'w-20 h-20' };
+      const textMap = { xs: 'text-[8px]', sm: 'text-xs', md: 'text-sm', lg: 'text-lg', xl: 'text-xl' };
       const sizeClasses = sizeMap[size] || sizeMap.md;
       const textSize = textMap[size] || textMap.md;
       const [imgError, setImgError] = React.useState(false);
@@ -936,7 +1031,24 @@
 
     // Main App
     function GameReplayApp() {
-      const [view, setView] = useState('search'); // Start with today's games
+      // URL state helpers
+      const getUrlParams = () => new URLSearchParams(window.location.search);
+      const updateUrl = (params) => {
+        const url = new URL(window.location);
+        Object.entries(params).forEach(([k, v]) => {
+          if (v != null) url.searchParams.set(k, v);
+          else url.searchParams.delete(k);
+        });
+        history.replaceState(null, '', url);
+      };
+      const clearUrl = () => history.replaceState(null, '', window.location.pathname);
+
+      // Check URL for deep-link params on init
+      const urlParams = getUrlParams();
+      const initialGamePk = urlParams.get('gamePk');
+      const initialMode = ['inning', 'play', 'pitch'].includes(urlParams.get('mode')) ? urlParams.get('mode') : 'inning';
+
+      const [view, setView] = useState(initialGamePk ? 'loading' : 'search');
       const [selectedDate, setSelectedDate] = useState(() => {
         // Get current time in Eastern Time
         const now = new Date();
@@ -957,8 +1069,9 @@
       const [games, setGames] = useState([]);
       const [isLoadingGames, setIsLoadingGames] = useState(false);
       const [gameData, setGameData] = useState(null);
-      const [loadingMessage, setLoadingMessage] = useState('Loading an exciting game...');
-      const [mode, setMode] = useState('inning'); // 'inning', 'play', or 'pitch'
+      const [currentGamePk, setCurrentGamePk] = useState(initialGamePk);
+      const [loadingMessage, setLoadingMessage] = useState('Loading game data...');
+      const [mode, setMode] = useState(initialMode); // 'inning', 'play', or 'pitch'
       const [isPlaying, setIsPlaying] = useState(false);
       const [speed, setSpeed] = useState(2000);
       const [currentStep, setCurrentStep] = useState(0);
@@ -966,9 +1079,27 @@
       const [celebrating, setCelebrating] = useState(false);
       const [scoringTeam, setScoringTeam] = useState(null);
       const prevStepRef = useRef(0);
-      const hasLoadedRandomGame = useRef(false);
-
-      // (Random game auto-load removed — app now starts with today's games)
+      const highlightPauseStepRef = useRef(null);
+      // Deep-link: auto-load game from URL gamePk param
+      useEffect(() => {
+        if (!initialGamePk) return;
+        const loadFromUrl = async () => {
+          setLoadingMessage('Loading game data...');
+          const details = await fetchGameDetails(initialGamePk);
+          if (details) {
+            const parsed = parseGameData(details.linescore, details.plays, details.content);
+            if (parsed && parsed.halfInnings.length > 0) {
+              setGameData(parsed);
+              setView('warning');
+              return;
+            }
+          }
+          // Game not found, fall back to search
+          clearUrl();
+          setView('search');
+        };
+        loadFromUrl();
+      }, []);
 
       // Check if current event is a home run (big event)
       const isHomeRun = (eventText) => {
@@ -1086,6 +1217,21 @@
 
       const currentHalfInning = getCurrentHalfInning();
 
+      // Manual step: advance one step
+      const handleStepForward = () => {
+        if (currentStep >= maxSteps) return;
+        setIsPlaying(false);
+        setCurrentStep(prev => prev + 1);
+      };
+
+      // Manual step: go back one step
+      const handleStepBack = () => {
+        if (currentStep <= 0) return;
+        setIsPlaying(false);
+        setCurrentStep(prev => prev - 1);
+      };
+
+      // Auto-play timer with peek-ahead for half-inning transitions
       useEffect(() => {
         if (!isPlaying || currentStep >= maxSteps) {
           if (currentStep >= maxSteps) setIsPlaying(false);
@@ -1113,46 +1259,43 @@
         return () => clearTimeout(timer);
       }, [isPlaying, currentStep, speed, maxSteps]);
 
+      // Auto-pause when a highlight video appears
+      useEffect(() => {
+        if (!isPlaying || !gameData?.highlightMap?.size) return;
+        // Don't re-pause on a step we already paused for
+        if (highlightPauseStepRef.current === currentStep) return;
+        if (mode === 'play') {
+          const plays = getFilteredPlays();
+          const currentPlay = plays[currentStep - 1];
+          if (currentPlay?.atBatIndex != null && gameData.highlightMap.get(currentPlay.atBatIndex)) {
+            highlightPauseStepRef.current = currentStep;
+            setIsPlaying(false);
+          }
+        } else if (mode === 'pitch') {
+          const currentPitch = gameData.pitches?.[currentStep - 1];
+          if (currentPitch?.isFinal && currentPitch?.atBatIndex != null && gameData.highlightMap.get(currentPitch.atBatIndex)) {
+            highlightPauseStepRef.current = currentStep;
+            setIsPlaying(false);
+          }
+        }
+      }, [currentStep, isPlaying, mode, gameData]);
+
       const handleSelectGame = async (game) => {
         setView('loading');
         setLoadingMessage('Loading game data...');
+        setCurrentGamePk(game.gamePk);
+        updateUrl({ gamePk: game.gamePk, mode: null });
         const details = await fetchGameDetails(game.gamePk);
         if (details) {
-          const parsed = parseGameData(details.linescore, details.plays);
+          const parsed = parseGameData(details.linescore, details.plays, details.content);
           if (parsed && parsed.halfInnings.length > 0) {
             setGameData(parsed);
             setView('warning');
             return;
           }
         }
-        // Fallback: try to load a random exciting game
-        setLoadingMessage('Game unavailable, finding another exciting game...');
-        const fallback = await fetchRandomExcitingGame();
-        if (fallback) {
-          const parsed = parseGameData(fallback.linescore, fallback.plays);
-          if (parsed && parsed.halfInnings.length > 0) {
-            setGameData(parsed);
-            setView('warning');
-            return;
-          }
-        }
-        // If all else fails, go back to search
-        setView('search');
-      };
-
-      const handleLoadRandomGame = async () => {
-        setView('loading');
-        setLoadingMessage('Finding an exciting game...');
-        const gameResult = await fetchRandomExcitingGame();
-        if (gameResult) {
-          const parsed = parseGameData(gameResult.linescore, gameResult.plays);
-          if (parsed && parsed.halfInnings.length > 0) {
-            setGameData(parsed);
-            setView('warning');
-            return;
-          }
-        }
-        // Fallback to search if nothing works
+        // Game unavailable, go back to search
+        clearUrl();
         setView('search');
       };
 
@@ -1160,13 +1303,17 @@
         setCurrentStep(0);
         setIsPlaying(false);
         setView('replay');
+        if (currentGamePk) updateUrl({ gamePk: currentGamePk, mode: mode });
       };
 
       const handleBack = () => {
+        clearUrl();
+        setCurrentGamePk(null);
         setView('search');
         setGameData(null);
         setCurrentStep(0);
         setIsPlaying(false);
+        highlightPauseStepRef.current = null;
       };
 
       const handlePlayPause = () => {
@@ -1177,12 +1324,16 @@
       const handleReset = () => {
         setIsPlaying(false);
         setCurrentStep(0);
+        highlightPauseStepRef.current = null;
       };
 
       const handleModeChange = (newMode) => {
         if (newMode === mode) return;
 
         setIsPlaying(false);
+        highlightPauseStepRef.current = null;
+
+        if (currentGamePk) updateUrl({ gamePk: currentGamePk, mode: newMode });
 
         // Map current position to the new mode
         if (currentStep === 0) {
@@ -1289,9 +1440,16 @@
           <div className="min-h-screen bg-gray-950 p-2 sm:p-4 md:p-8">
             <div className="max-w-2xl mx-auto">
               <div className="text-center mb-8">
-                <div className="text-7xl mb-4">⚾</div>
-                <h1 className="text-4xl font-bold text-white mb-2">Game Replay</h1>
-                <p className="text-gray-400 text-lg">Experience the game without spoilers</p>
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  <svg width="48" height="48" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="32" cy="32" r="30" fill="#f59e0b"/>
+                    <circle cx="32" cy="32" r="22" fill="#111827"/>
+                    <path d="M20 26 L32 18 L44 26 M20 38 L32 46 L44 38" stroke="#f59e0b" strokeWidth="3" fill="none" strokeLinecap="round"/>
+                    <circle cx="32" cy="32" r="3" fill="#f59e0b"/>
+                  </svg>
+                  <h1 className="text-4xl font-bold text-white">Replay<span className="text-amber-500">Baseball</span></h1>
+                </div>
+                <p className="text-gray-400 text-lg">Replay any game, spoiler-free</p>
               </div>
 
               <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 mb-6">
@@ -1300,7 +1458,8 @@
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white text-lg focus:outline-none focus:border-amber-600 transition-colors"
+                  className="w-full max-w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white text-lg focus:outline-none focus:border-amber-600 transition-colors box-border"
+                  style={{ WebkitAppearance: 'none' }}
                 />
               </div>
 
@@ -1312,7 +1471,7 @@
                   </div>
                 ) : games.length > 0 ? (
                   <>
-                    <p className="text-gray-400 text-sm mb-4">{games.filter(g => g.status.abstractGameState === "Final").length} completed game(s) available</p>
+                    <p className="text-gray-400 text-sm mb-4">{(() => { const count = games.filter(g => g.status.abstractGameState === "Final").length; return `${count} completed ${count === 1 ? 'game' : 'games'} available`; })()}</p>
                     {games.map((game) => (
                       <GameCard key={game.gamePk} game={game} onSelect={handleSelectGame} />
                     ))}
@@ -1326,15 +1485,6 @@
                 )}
               </div>
 
-              <div className="mt-8 pt-6 border-t border-gray-800">
-                <button
-                  onClick={handleLoadRandomGame}
-                  className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white py-4 rounded-xl transition-all flex items-center justify-center gap-3 font-semibold shadow-lg"
-                >
-                  <span className="text-2xl">🎲</span>
-                  <span>Load Random Exciting Game</span>
-                </button>
-              </div>
             </div>
           </div>
         );
@@ -1362,10 +1512,18 @@
         return (
           <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-gray-900 rounded-2xl p-8 text-center border border-gray-800 shadow-2xl">
-              <div className="text-7xl mb-4">⚾</div>
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <svg width="40" height="40" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="32" cy="32" r="30" fill="#f59e0b"/>
+                  <circle cx="32" cy="32" r="22" fill="#111827"/>
+                  <path d="M20 26 L32 18 L44 26 M20 38 L32 46 L44 38" stroke="#f59e0b" strokeWidth="3" fill="none" strokeLinecap="round"/>
+                  <circle cx="32" cy="32" r="3" fill="#f59e0b"/>
+                </svg>
+                <span className="text-2xl font-bold text-white">Replay<span className="text-amber-500">Baseball</span></span>
+              </div>
               <h1 className="text-3xl font-bold text-white mb-2">Ready to Replay</h1>
               <div className="inline-block px-4 py-1 bg-amber-600/20 rounded-full text-amber-400 font-semibold mb-6">
-                🎭 Spoiler-Free Experience
+                🎭 Spoiler-Free
               </div>
 
               <div className="bg-gray-800/50 rounded-xl p-5 mb-6 text-left">
@@ -1396,20 +1554,12 @@
                 ▶ Experience the Game
               </button>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={handleLoadRandomGame}
-                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
-                >
-                  <span>🎲</span> Random Game
-                </button>
-                <button
-                  onClick={handleBack}
-                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl transition-all"
-                >
-                  ← Browse Games
-                </button>
-              </div>
+              <button
+                onClick={handleBack}
+                className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl transition-all"
+              >
+                ← Browse Games
+              </button>
             </div>
           </div>
         );
@@ -1437,8 +1587,8 @@
                   <div className="text-amber-400 font-medium text-sm sm:text-base">{gameData.date}</div>
                   <div className="text-gray-500 text-xs sm:text-sm hidden sm:block">{gameData.venue}</div>
                 </div>
-                <button onClick={handleLoadRandomGame} className="text-gray-400 hover:text-amber-400 transition-all flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg hover:bg-gray-800 text-sm sm:text-base">
-                  🎲 <span className="hidden sm:inline">New Game</span>
+                <button onClick={handleBack} className="text-gray-400 hover:text-white transition-all flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg hover:bg-gray-800 text-sm sm:text-base">
+                  <span className="hidden sm:inline">Browse</span> Games
                 </button>
               </div>
 
@@ -1469,13 +1619,10 @@
 
               {/* Scoreboard - only shown in Half-Inning mode */}
               {mode === 'inning' && (
-              <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-2xl overflow-hidden shadow-2xl border border-gray-800 mb-3 sm:mb-6">
-                <div className="bg-gradient-to-r from-gray-800 via-gray-850 to-gray-800 p-2 sm:p-4 flex items-center justify-between border-b border-gray-700">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <span className="text-lg sm:text-2xl">⚾</span>
-                    <h2 className="text-white font-bold tracking-widest text-sm sm:text-base">SCOREBOARD</h2>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-900/50">
+              <div className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-2xl overflow-hidden shadow-2xl border border-gray-800 mb-3 sm:mb-6 relative">
+                {/* Status Badge */}
+                <div className="flex items-center justify-center pt-3 sm:pt-4">
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/80 border border-gray-700">
                     <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : isGameOver ? 'bg-amber-500' : 'bg-gray-500'}`}></div>
                     <span className={`text-sm font-medium ${isGameOver ? 'text-amber-400' : 'text-gray-400'}`}>
                       {isGameOver ? '🏆 FINAL' : isPlaying ? 'LIVE' : 'PAUSED'}
@@ -1484,16 +1631,16 @@
                 </div>
 
                 {/* Big Score */}
-                <div className="p-3 sm:p-8 bg-gradient-to-b from-gray-900 to-gray-950">
-                  <div className="flex items-center justify-center gap-4 sm:gap-8 md:gap-16">
+                <div className="p-4 sm:p-8 bg-gradient-to-b from-gray-900 to-gray-950">
+                  <div className="flex items-center justify-center gap-6 sm:gap-10 md:gap-16">
                     <div className={`text-center transition-all flex flex-col items-center ${isGameOver && winner === 'away' ? 'winning-glow rounded-xl p-2 sm:p-4' : ''}`}>
-                      <TeamLogo teamId={gameData.awayTeam.id} abbreviation={gameData.awayTeam.abbreviation} color={gameData.awayTeam.color} size="lg" />
-                      <div className="text-sm sm:text-lg font-bold mt-1" style={{ color: gameData.awayTeam.color }}>{gameData.awayTeam.abbreviation}</div>
+                      <TeamLogo teamId={gameData.awayTeam.id} abbreviation={gameData.awayTeam.abbreviation} color={gameData.awayTeam.color} size="xl" />
+                      <div className="text-base sm:text-xl font-bold mt-1" style={{ color: gameData.awayTeam.color }}>{gameData.awayTeam.abbreviation}</div>
                       <ScoreDisplay score={scores.away} />
                       {isGameOver && winner === 'away' && <div className="mt-3 text-green-400 text-sm font-bold">🏆 WINNER</div>}
                     </div>
                     <div className="text-center">
-                      <div className="text-gray-600 text-3xl sm:text-5xl font-light">—</div>
+                      <div className="text-gray-600 text-4xl sm:text-5xl font-light">—</div>
                       {currentStep > 0 && !isGameOver && currentHalfInning && (
                         <div className="text-amber-400 text-sm mt-3 bg-amber-900/30 px-3 py-1 rounded-full">
                           {currentHalfInning.isTop ? '▲' : '▼'} {currentHalfInning.inning}{getOrdinalSuffix(currentHalfInning.inning)}
@@ -1501,8 +1648,8 @@
                       )}
                     </div>
                     <div className={`text-center transition-all flex flex-col items-center ${isGameOver && winner === 'home' ? 'winning-glow rounded-xl p-2 sm:p-4' : ''}`}>
-                      <TeamLogo teamId={gameData.homeTeam.id} abbreviation={gameData.homeTeam.abbreviation} color={gameData.homeTeam.color} size="lg" />
-                      <div className="text-sm sm:text-lg font-bold mt-1" style={{ color: gameData.homeTeam.color }}>{gameData.homeTeam.abbreviation}</div>
+                      <TeamLogo teamId={gameData.homeTeam.id} abbreviation={gameData.homeTeam.abbreviation} color={gameData.homeTeam.color} size="xl" />
+                      <div className="text-base sm:text-xl font-bold mt-1" style={{ color: gameData.homeTeam.color }}>{gameData.homeTeam.abbreviation}</div>
                       <ScoreDisplay score={scores.home} />
                       {isGameOver && winner === 'home' && <div className="mt-3 text-green-400 text-sm font-bold">🏆 WINNER</div>}
                     </div>
@@ -1511,35 +1658,35 @@
 
                 {/* Inning Grid - Half-innings */}
                 {mode === 'inning' && (
-                  <div className="border-t border-gray-700 overflow-x-auto">
-                    <div className="flex bg-gray-800 min-w-max">
+                  <div className="border-t border-gray-700">
+                    <div className="flex bg-gray-800 w-full">
                       {/* Team names column */}
-                      <div className="w-16 flex flex-col border-r border-gray-700">
-                        <div className="h-6 flex items-center justify-center text-gray-500 text-xs font-medium border-b border-gray-700 bg-gray-850">
+                      <div className="w-12 sm:w-16 flex-shrink-0 flex flex-col border-r border-gray-700">
+                        <div className="h-9 sm:h-10 flex items-center justify-center text-gray-500 text-xs sm:text-sm font-medium border-b border-gray-700 bg-gray-850">
                           {/* Empty header cell */}
                         </div>
-                        <div className="h-6 flex items-center justify-center text-xs font-bold border-b border-gray-800" style={{ color: gameData.awayTeam.color }}>
+                        <div className="h-9 sm:h-10 flex items-center justify-center text-xs sm:text-sm font-bold border-b border-gray-800" style={{ color: gameData.awayTeam.color }}>
                           {gameData.awayTeam.abbreviation}
                         </div>
-                        <div className="h-6 flex items-center justify-center text-xs font-bold" style={{ color: gameData.homeTeam.color }}>
+                        <div className="h-9 sm:h-10 flex items-center justify-center text-xs sm:text-sm font-bold" style={{ color: gameData.homeTeam.color }}>
                           {gameData.homeTeam.abbreviation}
                         </div>
                       </div>
-                      {/* Innings columns */}
-                      <div className="flex">
+                      {/* Innings columns - flex-1 to fill available space */}
+                      <div className="flex flex-1 min-w-0">
                         {inningsGrid.map((ig, i) => (
-                          <div key={i} className="flex flex-col border-r border-gray-700">
-                            <div className="w-9 h-6 flex items-center justify-center text-xs text-gray-400 font-medium border-b border-gray-700 bg-gray-850">
+                          <div key={i} className="flex-1 flex flex-col border-r border-gray-700 min-w-0">
+                            <div className="h-9 sm:h-10 flex items-center justify-center text-xs sm:text-sm text-gray-400 font-medium border-b border-gray-700 bg-gray-850">
                               {ig.inning}
                             </div>
-                            <div className={`w-9 h-6 flex items-center justify-center font-mono text-sm border-b border-gray-800 ${ig.isCurrentTop ? 'bg-amber-900/40' : ''}`}>
+                            <div className={`h-9 sm:h-10 flex items-center justify-center font-mono text-sm sm:text-base border-b border-gray-800 ${ig.isCurrentTop ? 'bg-amber-900/40' : ''}`}>
                               {ig.topRevealed ? (
                                 <span className={ig.topRuns > 0 ? 'text-amber-400 font-bold' : 'text-gray-500'}>{ig.topRuns}</span>
                               ) : (
                                 <span className="text-gray-700">—</span>
                               )}
                             </div>
-                            <div className={`w-9 h-6 flex items-center justify-center font-mono text-sm ${ig.isCurrentBottom ? 'bg-amber-900/40' : ''}`}>
+                            <div className={`h-9 sm:h-10 flex items-center justify-center font-mono text-sm sm:text-base ${ig.isCurrentBottom ? 'bg-amber-900/40' : ''}`}>
                               {ig.bottomRevealed ? (
                                 <span className={ig.bottomRuns > 0 ? 'text-amber-400 font-bold' : 'text-gray-500'}>{ig.bottomRuns}</span>
                               ) : (
@@ -1550,19 +1697,43 @@
                         ))}
                       </div>
                       {/* Runs total column */}
-                      <div className="flex flex-col border-l-2 border-amber-600 bg-gray-800/80">
-                        <div className="h-6 w-10 flex items-center justify-center text-amber-400 text-xs font-bold border-b border-gray-700">R</div>
-                        <div className="h-6 w-10 flex items-center justify-center border-b border-gray-800">
-                          <span className="font-mono text-amber-400 font-bold text-sm">{scores.away}</span>
+                      <div className="w-10 sm:w-14 flex-shrink-0 flex flex-col border-l-2 border-amber-600 bg-gray-800/80">
+                        <div className="h-9 sm:h-10 flex items-center justify-center text-amber-400 text-xs sm:text-sm font-bold border-b border-gray-700">R</div>
+                        <div className="h-9 sm:h-10 flex items-center justify-center border-b border-gray-800">
+                          <span className="font-mono text-amber-400 font-bold text-sm sm:text-base">{scores.away}</span>
                         </div>
-                        <div className="h-6 w-10 flex items-center justify-center">
-                          <span className="font-mono text-amber-400 font-bold text-sm">{scores.home}</span>
+                        <div className="h-9 sm:h-10 flex items-center justify-center">
+                          <span className="font-mono text-amber-400 font-bold text-sm sm:text-base">{scores.home}</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
+              )}
+
+              {/* Play-by-Play Initial State */}
+              {mode === 'play' && currentStep === 0 && (
+                <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-2 sm:p-4 mb-2 sm:mb-6 border border-gray-800 relative overflow-hidden">
+                  <div className="flex justify-center mb-2 sm:mb-4 relative z-10">
+                    <DiamondScoreBug
+                      bases={{}}
+                      outs={0}
+                      inning={1}
+                      isTop={true}
+                      awayTeam={gameData.awayTeam}
+                      homeTeam={gameData.homeTeam}
+                      awayScore={0}
+                      homeScore={0}
+                      showCount={false}
+                      celebrating={false}
+                      scoringTeam={null}
+                    />
+                  </div>
+                  <div className="text-center py-2 sm:py-4">
+                    <p className="text-gray-400 text-sm">Press play to see every play unfold</p>
+                  </div>
+                </div>
               )}
 
               {/* Play-by-Play with Score Bug */}
@@ -1652,7 +1823,7 @@
                       {scoringPlaysOnly ? '✓ Scoring Only' : 'Show All'}
                     </button>
                   </div>
-                  <div className="max-h-24 sm:max-h-40 overflow-y-auto">
+                  <div className="max-h-96 sm:max-h-[500px] overflow-y-auto transition-all duration-300">
                     {/* Show "end of half" divider when the latest play is the last of its half-inning */}
                     {(() => {
                       const nextPlay = filteredPlays[currentStep];
@@ -1663,9 +1834,9 @@
                       return null;
                     })()}
                     {filteredPlays.slice(0, currentStep).reverse().map((play, i, arr) => {
-                      // Show divider when half-inning changes between adjacent plays in the reversed list
                       const nextInList = arr[i + 1];
                       const showDivider = nextInList && (nextInList.inning !== play.inning || nextInList.isTop !== play.isTop);
+                      const hl = play.atBatIndex != null ? gameData.highlightMap?.get(play.atBatIndex) : null;
                       return (
                         <React.Fragment key={i}>
                           <PlayCard
@@ -1673,6 +1844,7 @@
                             homeTeam={gameData.homeTeam}
                             awayTeam={gameData.awayTeam}
                             isNew={i === 0 && isPlaying}
+                            highlight={hl}
                           />
                           {showDivider && (
                             <HalfInningDivider />
@@ -1734,14 +1906,30 @@
                           />
                         </div>
 
-                        {/* Current At-Bat Info */}
-                        <div className="text-center mb-2 sm:mb-4">
-                          <div className="text-gray-400 text-xs sm:text-sm">Now Batting</div>
-                          <div className="text-white text-base sm:text-xl font-bold">{currentPitch.batter}</div>
+                        {/* Current Matchup */}
+                        <div className="flex items-center justify-center gap-4 sm:gap-8 mb-2 sm:mb-4">
+                          <div className="text-center">
+                            <div className="text-gray-500 text-xs">Pitching</div>
+                            <div className="text-gray-300 text-sm sm:text-base font-semibold">{currentPitch.pitcher}</div>
+                          </div>
+                          <div className="text-gray-600 text-xs">vs</div>
+                          <div className="text-center">
+                            <div className="text-gray-500 text-xs">Batting</div>
+                            <div className="text-white text-sm sm:text-base font-bold">{currentPitch.batter}</div>
+                          </div>
                         </div>
 
                         {/* Pitch Info */}
-                        <div className={`p-2 sm:p-4 rounded-xl border-2 transition-all ${(currentPitch.isFinal || currentPitch.isResult) ? 'border-amber-500 bg-amber-900/20' : 'border-gray-700 bg-gray-800/50'}`}>
+                        {(() => {
+                          // Determine accent color for final result
+                          const outKeywords = ['Strikeout', 'Groundout', 'Flyout', 'Lineout', 'Pop Out', 'Forceout', 'Double Play', 'Triple Play', 'Fielders Choice Out', 'Grounded Into', 'Sac Fly', 'Sac Bunt', 'Sacrifice'];
+                          const isOut = currentPitch.isFinal && currentPitch.finalResult && outKeywords.some(kw => currentPitch.finalResult.includes(kw));
+                          const isRunScoring = currentPitch.isFinal && currentPitch.finalResult && !isOut;
+                          // Border/bg for final pitch result
+                          const finalBorder = isOut ? 'border-purple-500 bg-purple-900/20' : isRunScoring ? 'border-blue-500 bg-blue-900/20' : 'border-amber-500 bg-amber-900/20';
+                          const finalTextColor = isOut ? 'text-purple-400' : isRunScoring ? 'text-blue-400' : 'text-amber-400';
+                          return (
+                        <div className={`p-2 sm:p-4 rounded-xl border-2 transition-all ${(currentPitch.isFinal || currentPitch.isResult) ? finalBorder : 'border-gray-700 bg-gray-800/50'}`}>
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-gray-400">Pitch #{currentPitch.pitchNum}</span>
                             <span className="text-amber-400 font-mono font-bold">{currentPitch.balls}-{currentPitch.strikes}</span>
@@ -1751,35 +1939,45 @@
                               <div className="text-white font-semibold text-lg">{currentPitch.type}</div>
                               {currentPitch.speed && <div className="text-gray-400">{currentPitch.speed} mph</div>}
                             </div>
-                            <div className={`text-right font-bold ${(currentPitch.isFinal || currentPitch.isResult) ? 'text-amber-400 text-lg' : currentPitch.result?.includes('Strike') ? 'text-yellow-400' : currentPitch.result?.includes('Ball') ? 'text-green-400' : 'text-gray-300'}`}>
+                            <div className={`text-right font-bold ${(currentPitch.isFinal || currentPitch.isResult) ? `${finalTextColor} text-lg` : currentPitch.result?.includes('Strike') || currentPitch.result?.includes('Foul') ? 'text-red-400' : currentPitch.result?.includes('Ball') ? 'text-green-400' : 'text-gray-300'}`}>
                               {currentPitch.result}
                             </div>
                           </div>
                           {/* Show at-bat result for final pitch */}
                           {currentPitch.isFinal && currentPitch.finalResult && (
-                            <div className="mt-3 pt-3 border-t border-amber-700/50 text-center">
-                              <span className="text-amber-400 font-bold text-lg">⚾ {currentPitch.finalResult}</span>
+                            <div className={`mt-3 pt-3 border-t ${isOut ? 'border-purple-700/50' : isRunScoring ? 'border-blue-700/50' : 'border-amber-700/50'} text-center`}>
+                              <span className={`${finalTextColor} font-bold text-lg`}>⚾ {currentPitch.finalResult}</span>
                             </div>
                           )}
+                          {currentPitch.isFinal && currentPitch.atBatIndex != null && gameData.highlightMap?.get(currentPitch.atBatIndex) && (
+                            <VideoPlayer
+                              highlight={gameData.highlightMap.get(currentPitch.atBatIndex)}
+                            />
+                          )}
                         </div>
+                          );
+                        })()}
 
-                        {/* Pitch sequence for this at-bat */}
+                        {/* Pitch sequence for this at-bat - only show revealed pitches */}
                         <div className="mt-2 sm:mt-4">
                           <div className="text-gray-500 text-xs mb-1 sm:mb-2">Pitch Sequence</div>
                           <div className="flex gap-1 flex-wrap">
                             {gameData.pitches
                               .filter(p => p.playIndex === currentPitch.playIndex)
+                              .slice(0, currentPitch.pitchNum)
                               .map((p, i) => (
                                 <div
                                   key={i}
                                   className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                    i < currentPitch.pitchNum
-                                      ? p.result?.includes('Strike') || p.result?.includes('Foul')
-                                        ? 'bg-yellow-600 text-white'
-                                        : p.result?.includes('Ball')
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-amber-500 text-white'
-                                      : 'bg-gray-700 text-gray-500'
+                                    p.result?.includes('Strike') || p.result?.includes('Foul')
+                                      ? 'bg-red-600 text-white'
+                                      : p.result?.includes('Ball')
+                                      ? 'bg-green-600 text-white'
+                                      : p.isFinal && p.finalResult && ['Strikeout', 'Groundout', 'Flyout', 'Lineout', 'Pop Out', 'Forceout', 'Double Play', 'Triple Play', 'Fielders Choice Out', 'Grounded Into', 'Sac Fly', 'Sac Bunt', 'Sacrifice'].some(kw => p.finalResult.includes(kw))
+                                      ? 'bg-purple-600 text-white'
+                                      : p.isFinal
+                                      ? 'bg-blue-500 text-white'
+                                      : 'bg-gray-500 text-white'
                                   } ${i === currentPitch.pitchNum - 1 ? 'ring-2 ring-white' : ''}`}
                                 >
                                   {i + 1}
@@ -1795,79 +1993,37 @@
 
               {/* Pitch mode info when no pitches revealed */}
               {mode === 'pitch' && currentStep === 0 && (
-                <div className="bg-gray-900 rounded-2xl p-6 mb-6 border border-gray-800 text-center">
-                  <div className="text-4xl mb-3">🎯</div>
-                  <h3 className="text-white font-bold mb-2">Pitch-by-Pitch Mode</h3>
-                  <p className="text-gray-400 text-sm">Experience key at-bats pitch by pitch.</p>
-                  <p className="text-gray-500 text-xs mt-2">Press play to see dramatic moments unfold!</p>
-                </div>
-              )}
-
-              {/* Scoring plays filter toggle in play mode */}
-              {mode === 'play' && (
-                <div className="flex justify-center mb-2 sm:mb-4">
-                  <button
-                    onClick={() => {
-                        setIsPlaying(false);
-                        const currentPlays = getFilteredPlays();
-                        const lastPlay = currentPlays[currentStep - 1];
-
-                        // Toggle the filter
-                        const newScoringOnly = !scoringPlaysOnly;
-                        setScoringPlaysOnly(newScoringOnly);
-
-                        // Map position to new filter
-                        if (lastPlay && currentStep > 0) {
-                          const newPlays = newScoringOnly
-                            ? gameData.plays.filter(p => p.isScoring)
-                            : gameData.plays;
-
-                          // Find equivalent position in new play list
-                          let newStep = 0;
-                          for (let i = 0; i < newPlays.length; i++) {
-                            const p = newPlays[i];
-                            if (p.inning < lastPlay.inning ||
-                                (p.inning === lastPlay.inning && p.isTop === lastPlay.isTop &&
-                                 newPlays.indexOf(p) <= gameData.plays.indexOf(lastPlay))) {
-                              newStep = i + 1;
-                            }
-                            if (p.inning === lastPlay.inning && p.isTop === lastPlay.isTop &&
-                                gameData.plays.indexOf(p) >= gameData.plays.indexOf(lastPlay)) {
-                              newStep = i + 1;
-                              break;
-                            }
-                          }
-                          setCurrentStep(Math.min(newStep, newPlays.length));
-                        }
-                      }}
-                    className={`text-sm px-4 py-2 rounded-lg transition-all ${
-                      scoringPlaysOnly
-                        ? 'bg-green-900/50 text-green-400 border border-green-700'
-                        : 'bg-gray-800 text-gray-400 border border-gray-700'
-                    }`}
-                  >
-                    {scoringPlaysOnly ? '✓ Scoring Plays Only' : 'Showing All Plays'}
-                  </button>
+                <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-2 sm:p-4 mb-2 sm:mb-6 border border-gray-800 relative overflow-hidden">
+                  <div className="flex justify-center mb-2 sm:mb-4 relative z-10">
+                    <DiamondScoreBug
+                      bases={{}}
+                      outs={0}
+                      inning={1}
+                      isTop={true}
+                      awayTeam={gameData.awayTeam}
+                      homeTeam={gameData.homeTeam}
+                      awayScore={0}
+                      homeScore={0}
+                      balls={0}
+                      strikes={0}
+                      showCount={true}
+                      celebrating={false}
+                      scoringTeam={null}
+                    />
+                  </div>
+                  <div className="text-center py-2 sm:py-4">
+                    <p className="text-gray-400 text-sm">Press play to see dramatic moments unfold</p>
+                  </div>
                 </div>
               )}
 
               {/* Controls */}
-              <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-3 sm:p-6 border border-gray-800">
-                <div className="mb-3 sm:mb-6">
-                  <div className="text-gray-400 text-xs sm:text-sm mb-2 sm:mb-3 text-center font-medium">⏱ PLAYBACK SPEED</div>
-                  <div className="flex justify-center gap-1 sm:gap-2 flex-wrap">
-                    <SpeedButton speed={4000} currentSpeed={speed} onClick={setSpeed} label="🐢 Slow" />
-                    <SpeedButton speed={2000} currentSpeed={speed} onClick={setSpeed} label="Normal" />
-                    <SpeedButton speed={800} currentSpeed={speed} onClick={setSpeed} label="🐇 Fast" />
-                    <SpeedButton speed={200} currentSpeed={speed} onClick={setSpeed} label="⚡ Rapid" />
-                  </div>
-                </div>
-
-                <div className="flex justify-center gap-2 sm:gap-3">
+              <div className="bg-gray-900 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-800">
+                <div className="flex justify-center items-center gap-2 sm:gap-3">
                   <button onClick={handleReset} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-lg sm:rounded-xl transition-all" title="Reset">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                   </button>
-                  <button onClick={() => currentStep > 0 && setCurrentStep(prev => prev - 1)} disabled={currentStep === 0} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg sm:rounded-xl transition-all">
+                  <button onClick={handleStepBack} disabled={currentStep === 0} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg sm:rounded-xl transition-all">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                   </button>
                   <button onClick={handlePlayPause} className="p-3 sm:p-4 bg-amber-600 hover:bg-amber-500 rounded-lg sm:rounded-xl transition-all shadow-lg transform hover:scale-105">
@@ -1877,18 +2033,49 @@
                       <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     )}
                   </button>
-                  <button onClick={() => currentStep < maxSteps && setCurrentStep(prev => prev + 1)} disabled={currentStep >= maxSteps} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg sm:rounded-xl transition-all">
+                  <button onClick={handleStepForward} disabled={currentStep >= maxSteps} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg sm:rounded-xl transition-all">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   </button>
                   <button onClick={() => { setIsPlaying(false); setCurrentStep(maxSteps); }} className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-lg sm:rounded-xl transition-all" title="Skip to end">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
                   </button>
-                </div>
 
+                  {/* Speed popover */}
+                  {(() => {
+                    const speedLabels = { 4000: '0.5x', 2000: '1x', 800: '2x', 200: '5x' };
+                    return (
+                      <div className="relative group ml-1">
+                        <button className="p-2 sm:p-3 bg-gray-700 hover:bg-gray-600 rounded-lg sm:rounded-xl transition-all flex items-center gap-1" title="Playback Speed">
+                          <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                          <span className="text-xs sm:text-sm font-medium text-amber-400">{speedLabels[speed] || '1x'}</span>
+                        </button>
+                        <div className="absolute bottom-full right-0 pb-2 hidden group-hover:flex flex-col z-50">
+                        <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-2 gap-1 min-w-[120px] flex flex-col">
+                          <div className="text-gray-500 text-xs text-center mb-1 font-medium">Speed</div>
+                          {[
+                            { speed: 4000, label: '0.5x Slow' },
+                            { speed: 2000, label: '1x Normal' },
+                            { speed: 800, label: '2x Fast' },
+                            { speed: 200, label: '5x Rapid' }
+                          ].map(opt => (
+                            <button
+                              key={opt.speed}
+                              onClick={() => setSpeed(opt.speed)}
+                              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-left ${speed === opt.speed ? 'bg-amber-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
               <div className="text-center mt-3 sm:mt-6 text-gray-600 text-xs sm:text-sm">
-                ⚾ Game Replay • Experience the drama without spoilers
+                Replay<span className="text-gray-500">Baseball</span> • Replay any game, spoiler-free
               </div>
             </div>
           </div>
